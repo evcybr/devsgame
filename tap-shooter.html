@@ -1,0 +1,563 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap Tap Shooter - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Tap Tap Shooter</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Tap to shoot targets before they disappear!</h2>
+            <div class="score-board">
+                <span>Score: <span id="score">0</span></span>
+                <span style="margin-left: 20px;">Time: <span id="time">60</span>s</span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Game</button>
+                <div class="difficulty-select">
+                    <select id="difficulty-select">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div id="shooter-game" class="shooter-game">
+                <!-- Targets will be added here dynamically -->
+                <div id="crosshair" class="crosshair"></div>
+                <div id="game-message" class="game-message"></div>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Playful Browser Arcade</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const shooterGame = document.getElementById('shooter-game');
+            const crosshair = document.getElementById('crosshair');
+            const gameMessage = document.getElementById('game-message');
+            const scoreDisplay = document.getElementById('score');
+            const timeDisplay = document.getElementById('time');
+            const startBtn = document.getElementById('start-btn');
+            const difficultySelect = document.getElementById('difficulty-select');
+            
+            // Game variables
+            let score = 0;
+            let timeLeft = 60;
+            let gameActive = false;
+            let targetInterval;
+            let timeInterval;
+            let targets = [];
+            let difficultySettings = {
+                easy: {
+                    targetLifespan: 2500,
+                    targetSpawnRate: 1200,
+                    targetSizes: [60, 80, 100],
+                    moveSpeed: 0.5,
+                    pointMultiplier: 1
+                },
+                medium: {
+                    targetLifespan: 2000,
+                    targetSpawnRate: 1000,
+                    targetSizes: [50, 70, 90],
+                    moveSpeed: 1,
+                    pointMultiplier: 2
+                },
+                hard: {
+                    targetLifespan: 1500,
+                    targetSpawnRate: 800,
+                    targetSizes: [40, 60, 80],
+                    moveSpeed: 1.5,
+                    pointMultiplier: 3
+                }
+            };
+            let currentDifficulty;
+            
+            // Sound effects
+            const shootSound = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAKAAAMgAA4ODg4ODg4ODg4ODhiYmJiYmJiYmJiYmKMjIyMjIyMjIyMjIy2tra2tra2tra2trbg4ODg4ODg4ODg4OD///////////////8AAAAATGF2YzU4LjU5AAAAAAAAAAAAAAAAJAUHgQAAAAAAAAAMgCQm01nwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+5DEAAAAAAGkAAAAIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUQAP/7EsQAA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVA==');
+            const targetHitSound = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAAKAAANsAA5OTk5OTk5OTk5OTlZWVlZWVlZWVlZWVl5eXl5eXl5eXl5eXmYmJiYmJiYmJiYmJi4uLi4uLi4uLi4uLjY2NjY2NjY2NjY2Nj4+Pj4+Pj4+Pj4+Pj///////////////8AAAAATGF2YzU4LjU5AAAAAAAAAAAAAAAAJASiAAAAAAAADbCDDLpYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/+5DEAAAAAAGkAAAAIAAANIAAAARMQU1FMy4xMDBVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVUQAP/7EsQAA8AAAaQAAAAgAAA0gAAABFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVA==');
+            
+            // Initialize game
+            function initGame() {
+                // Set difficulty
+                currentDifficulty = difficultySettings[difficultySelect.value];
+                
+                // Reset variables
+                score = 0;
+                timeLeft = 60;
+                gameActive = true;
+                targets = [];
+                
+                // Clear existing targets
+                clearTargets();
+                
+                // Update displays
+                scoreDisplay.textContent = score;
+                timeDisplay.textContent = timeLeft;
+                
+                // Show message
+                showMessage('Get ready... Aim and tap!', 2000);
+                
+                // Start spawning targets after a short delay
+                setTimeout(() => {
+                    targetInterval = setInterval(spawnTarget, currentDifficulty.targetSpawnRate);
+                    timeInterval = setInterval(updateTimer, 1000);
+                }, 2000);
+                
+                // Hide start button
+                startBtn.style.display = 'none';
+            }
+            
+            // Spawn a new target
+            function spawnTarget() {
+                if (!gameActive) return;
+                
+                // Create target element
+                const target = document.createElement('div');
+                target.className = 'target';
+                
+                // Randomly select target size
+                const sizeIndex = Math.floor(Math.random() * currentDifficulty.targetSizes.length);
+                const size = currentDifficulty.targetSizes[sizeIndex];
+                
+                // Calculate points based on size (smaller = more points)
+                const points = 10 - (sizeIndex * 2);
+                
+                // Set target properties
+                target.style.width = `${size}px`;
+                target.style.height = `${size}px`;
+                
+                // Position target randomly
+                const maxX = shooterGame.offsetWidth - size;
+                const maxY = shooterGame.offsetHeight - size;
+                const x = Math.floor(Math.random() * maxX);
+                const y = Math.floor(Math.random() * maxY);
+                
+                target.style.left = `${x}px`;
+                target.style.top = `${y}px`;
+                
+                // Generate random movement direction
+                const dx = (Math.random() - 0.5) * currentDifficulty.moveSpeed;
+                const dy = (Math.random() - 0.5) * currentDifficulty.moveSpeed;
+                
+                // Store target data
+                const targetData = {
+                    element: target,
+                    x: x,
+                    y: y,
+                    dx: dx,
+                    dy: dy,
+                    size: size,
+                    points: points * currentDifficulty.pointMultiplier,
+                    createdAt: Date.now()
+                };
+                
+                targets.push(targetData);
+                
+                // Add target to game
+                shooterGame.appendChild(target);
+                
+                // Add click event
+                target.addEventListener('mousedown', function(e) {
+                    e.preventDefault(); // Prevent default to avoid text selection
+                    hitTarget(targetData);
+                });
+                
+                // Add touch event for mobile
+                target.addEventListener('touchstart', function(e) {
+                    e.preventDefault(); // Prevent default to avoid scrolling
+                    hitTarget(targetData);
+                });
+                
+                // Set target to disappear after its lifespan
+                setTimeout(() => {
+                    // Only remove if target still exists and game is active
+                    if (targets.includes(targetData) && gameActive) {
+                        // Add miss animation
+                        target.classList.add('missed');
+                        
+                        // Remove after animation
+                        setTimeout(() => {
+                            if (targets.includes(targetData)) {
+                                removeTarget(targetData);
+                            }
+                        }, 300);
+                    }
+                }, currentDifficulty.targetLifespan);
+                
+                // Start animation frame for moving targets
+                if (!animationRunning) {
+                    animationRunning = true;
+                    requestAnimationFrame(moveTargets);
+                }
+            }
+            
+            // Move targets animation
+            let animationRunning = false;
+            
+            function moveTargets() {
+                if (!gameActive) {
+                    animationRunning = false;
+                    return;
+                }
+                
+                targets.forEach(target => {
+                    // Update position
+                    target.x += target.dx;
+                    target.y += target.dy;
+                    
+                    // Check boundaries
+                    const maxX = shooterGame.offsetWidth - target.size;
+                    const maxY = shooterGame.offsetHeight - target.size;
+                    
+                    // Bounce off walls
+                    if (target.x <= 0 || target.x >= maxX) {
+                        target.dx = -target.dx;
+                        target.x = target.x <= 0 ? 0 : maxX;
+                    }
+                    
+                    if (target.y <= 0 || target.y >= maxY) {
+                        target.dy = -target.dy;
+                        target.y = target.y <= 0 ? 0 : maxY;
+                    }
+                    
+                    // Update element position
+                    target.element.style.left = `${target.x}px`;
+                    target.element.style.top = `${target.y}px`;
+                });
+                
+                // Continue animation
+                if (gameActive && targets.length > 0) {
+                    requestAnimationFrame(moveTargets);
+                } else {
+                    animationRunning = false;
+                }
+            }
+            
+            // Hit target function
+            function hitTarget(targetData) {
+                if (!gameActive) return;
+                
+                // Remove target from array
+                const index = targets.indexOf(targetData);
+                if (index !== -1) {
+                    targets.splice(index, 1);
+                    
+                    // Update score
+                    score += targetData.points;
+                    scoreDisplay.textContent = score;
+                    
+                    // Play hit sound
+                    targetHitSound.currentTime = 0;
+                    targetHitSound.play();
+                    
+                    // Show hit animation
+                    targetData.element.classList.add('hit');
+                    
+                    // Show points
+                    const pointsElement = document.createElement('div');
+                    pointsElement.className = 'points-popup';
+                    pointsElement.textContent = `+${targetData.points}`;
+                    pointsElement.style.left = `${targetData.x + targetData.size / 2}px`;
+                    pointsElement.style.top = `${targetData.y}px`;
+                    shooterGame.appendChild(pointsElement);
+                    
+                    // Remove point element after animation
+                    setTimeout(() => {
+                        if (shooterGame.contains(pointsElement)) {
+                            shooterGame.removeChild(pointsElement);
+                        }
+                    }, 1000);
+                    
+                    // Remove target element after animation
+                    setTimeout(() => {
+                        if (shooterGame.contains(targetData.element)) {
+                            shooterGame.removeChild(targetData.element);
+                        }
+                    }, 200);
+                }
+            }
+            
+            // Remove target function
+            function removeTarget(targetData) {
+                // Remove target from array
+                const index = targets.indexOf(targetData);
+                if (index !== -1) {
+                    targets.splice(index, 1);
+                    
+                    // Remove element
+                    if (shooterGame.contains(targetData.element)) {
+                        shooterGame.removeChild(targetData.element);
+                    }
+                }
+            }
+            
+            // Clear all targets
+            function clearTargets() {
+                targets.forEach(target => {
+                    if (shooterGame.contains(target.element)) {
+                        shooterGame.removeChild(target.element);
+                    }
+                });
+                
+                targets = [];
+            }
+            
+            // Update timer function
+            function updateTimer() {
+                if (timeLeft <= 0) {
+                    endGame();
+                    return;
+                }
+                
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+            }
+            
+            // End game function
+            function endGame() {
+                gameActive = false;
+                
+                // Clear intervals
+                clearInterval(targetInterval);
+                clearInterval(timeInterval);
+                
+                // Show game over message
+                showMessage(`Game Over! Final Score: ${score}`, 0);
+                
+                // Show start button
+                startBtn.style.display = 'inline-block';
+                startBtn.textContent = 'Play Again';
+                
+                // Clear remaining targets after a delay
+                setTimeout(clearTargets, 1000);
+            }
+            
+            // Show message function
+            function showMessage(text, duration = 2000) {
+                gameMessage.textContent = text;
+                gameMessage.style.display = 'block';
+                
+                if (duration > 0) {
+                    setTimeout(() => {
+                        gameMessage.style.display = 'none';
+                    }, duration);
+                }
+            }
+            
+            // Shoot function (when clicking anywhere in the game area)
+            function shoot(e) {
+                if (!gameActive) return;
+                
+                // Play shoot sound
+                shootSound.currentTime = 0;
+                shootSound.play();
+                
+                // Show muzzle flash effect at crosshair position
+                const flash = document.createElement('div');
+                flash.className = 'muzzle-flash';
+                flash.style.left = `${crosshair.offsetLeft + crosshair.offsetWidth / 2}px`;
+                flash.style.top = `${crosshair.offsetTop + crosshair.offsetHeight / 2}px`;
+                shooterGame.appendChild(flash);
+                
+                // Remove flash after animation
+                setTimeout(() => {
+                    if (shooterGame.contains(flash)) {
+                        shooterGame.removeChild(flash);
+                    }
+                }, 100);
+            }
+            
+            // Move crosshair
+            function moveCrosshair(e) {
+                let x, y;
+                
+                if (e.type === 'mousemove') {
+                    x = e.clientX;
+                    y = e.clientY;
+                } else if (e.type === 'touchmove') {
+                    x = e.touches[0].clientX;
+                    y = e.touches[0].clientY;
+                }
+                
+                // Get game area position
+                const rect = shooterGame.getBoundingClientRect();
+                
+                // Calculate position within game area
+                const gameX = x - rect.left;
+                const gameY = y - rect.top;
+                
+                // Update crosshair position
+                crosshair.style.left = `${gameX - crosshair.offsetWidth / 2}px`;
+                crosshair.style.top = `${gameY - crosshair.offsetHeight / 2}px`;
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', initGame);
+            
+            // Mouse events
+            shooterGame.addEventListener('mousedown', shoot);
+            shooterGame.addEventListener('mousemove', moveCrosshair);
+            
+            // Touch events for mobile
+            shooterGame.addEventListener('touchstart', shoot);
+            shooterGame.addEventListener('touchmove', moveCrosshair);
+            
+            // Prevent context menu on right click
+            shooterGame.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+            });
+        });
+    </script>
+    
+    <style>
+        /* Game specific styles */
+        .shooter-game {
+            width: 100%;
+            height: 400px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            cursor: none;
+        }
+        
+        .target {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, #FF9800 0%, #F44336 60%, #D32F2F 100%);
+            border: 2px solid #FFF;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+        
+        .target.hit {
+            transform: scale(0.5);
+            opacity: 0;
+            background: radial-gradient(circle, #FFEB3B 0%, #FFC107 100%);
+        }
+        
+        .target.missed {
+            transform: scale(0.8);
+            opacity: 0;
+        }
+        
+        .crosshair {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='30' fill='none' stroke='red' stroke-width='2'/%3E%3Ccircle cx='50' cy='50' r='2' fill='red'/%3E%3Cline x1='50' y1='30' x2='50' y2='40' stroke='red' stroke-width='2'/%3E%3Cline x1='50' y1='60' x2='50' y2='70' stroke='red' stroke-width='2'/%3E%3Cline x1='30' y1='50' x2='40' y2='50' stroke='red' stroke-width='2'/%3E%3Cline x1='60' y1='50' x2='70' y2='50' stroke='red' stroke-width='2'/%3E%3C/svg%3E");
+            background-size: contain;
+            background-repeat: no-repeat;
+            pointer-events: none;
+            z-index: 10;
+            transform: translate(-50%, -50%);
+        }
+        
+        .muzzle-flash {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='45' fill='%23FFA000' opacity='0.8'/%3E%3Ccircle cx='50' cy='50' r='30' fill='%23FFEB3B' opacity='0.9'/%3E%3Ccircle cx='50' cy='50' r='15' fill='white'/%3E%3C/svg%3E");
+            background-size: contain;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            animation: flash 0.1s forwards;
+            z-index: 5;
+        }
+        
+        @keyframes flash {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+        }
+        
+        .points-popup {
+            position: absolute;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+            pointer-events: none;
+            text-shadow: 0 0 3px rgba(0, 0, 0, 0.7);
+            animation: points-anim 1s forwards;
+            z-index: 20;
+            transform: translate(-50%, 0);
+        }
+        
+        @keyframes points-anim {
+            0% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, -30px); }
+        }
+        
+        .game-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-align: center;
+            display: none;
+            z-index: 100;
+        }
+        
+        .difficulty-select {
+            display: inline-block;
+            margin-left: 10px;
+        }
+        
+        .difficulty-select select {
+            padding: 8px 12px;
+            border-radius: 25px;
+            border: 1px solid var(--border);
+            background-color: var(--card-bg);
+            color: var(--text);
+        }
+    </style>
+</body>
+</html>

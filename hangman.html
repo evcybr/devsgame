@@ -1,0 +1,524 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tebak Kata (Hangman) - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Tebak Kata (Hangman)</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Guess the word before the hangman is complete!</h2>
+            <div class="score-board">
+                <span>Wins: <span id="wins">0</span></span>
+                <span style="margin-left: 20px;">Losses: <span id="losses">0</span></span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">New Game</button>
+                <div class="category-select">
+                    <select id="category-select">
+                        <option value="animals">Animals</option>
+                        <option value="fruits">Fruits</option>
+                        <option value="countries">Countries</option>
+                        <option value="sports">Sports</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div id="hangman-game" class="hangman-game">
+                <div class="hangman-container">
+                    <svg id="hangman-svg" width="200" height="200" viewBox="0 0 200 200">
+                        <!-- Base -->
+                        <line id="hangman-base" x1="20" y1="180" x2="180" y2="180" stroke-width="5" stroke="var(--text)" />
+                        <!-- Pole -->
+                        <line id="hangman-pole" x1="60" y1="20" x2="60" y2="180" stroke-width="5" stroke="var(--text)" />
+                        <!-- Top beam -->
+                        <line id="hangman-beam" x1="60" y1="20" x2="120" y2="20" stroke-width="5" stroke="var(--text)" />
+                        <!-- Rope -->
+                        <line id="hangman-rope" x1="120" y1="20" x2="120" y2="40" stroke-width="5" stroke="var(--text)" />
+                        <!-- Head (hidden initially) -->
+                        <circle id="hangman-head" cx="120" cy="60" r="20" stroke-width="5" stroke="var(--text)" fill="transparent" />
+                        <!-- Body (hidden initially) -->
+                        <line id="hangman-body" x1="120" y1="80" x2="120" y2="120" stroke-width="5" stroke="var(--text)" />
+                        <!-- Left arm (hidden initially) -->
+                        <line id="hangman-left-arm" x1="120" y1="90" x2="100" y2="100" stroke-width="5" stroke="var(--text)" />
+                        <!-- Right arm (hidden initially) -->
+                        <line id="hangman-right-arm" x1="120" y1="90" x2="140" y2="100" stroke-width="5" stroke="var(--text)" />
+                        <!-- Left leg (hidden initially) -->
+                        <line id="hangman-left-leg" x1="120" y1="120" x2="100" y2="150" stroke-width="5" stroke="var(--text)" />
+                        <!-- Right leg (hidden initially) -->
+                        <line id="hangman-right-leg" x1="120" y1="120" x2="140" y2="150" stroke-width="5" stroke="var(--text)" />
+                    </svg>
+                </div>
+                
+                <div class="word-display">
+                    <div id="word-container" class="word-container"></div>
+                    <p id="hint-text" class="hint-text"></p>
+                </div>
+                
+                <div class="keyboard">
+                    <div class="keyboard-row">
+                        <button class="key-btn" data-key="Q">Q</button>
+                        <button class="key-btn" data-key="W">W</button>
+                        <button class="key-btn" data-key="E">E</button>
+                        <button class="key-btn" data-key="R">R</button>
+                        <button class="key-btn" data-key="T">T</button>
+                        <button class="key-btn" data-key="Y">Y</button>
+                        <button class="key-btn" data-key="U">U</button>
+                        <button class="key-btn" data-key="I">I</button>
+                        <button class="key-btn" data-key="O">O</button>
+                        <button class="key-btn" data-key="P">P</button>
+                    </div>
+                    <div class="keyboard-row">
+                        <button class="key-btn" data-key="A">A</button>
+                        <button class="key-btn" data-key="S">S</button>
+                        <button class="key-btn" data-key="D">D</button>
+                        <button class="key-btn" data-key="F">F</button>
+                        <button class="key-btn" data-key="G">G</button>
+                        <button class="key-btn" data-key="H">H</button>
+                        <button class="key-btn" data-key="J">J</button>
+                        <button class="key-btn" data-key="K">K</button>
+                        <button class="key-btn" data-key="L">L</button>
+                    </div>
+                    <div class="keyboard-row">
+                        <button class="key-btn" data-key="Z">Z</button>
+                        <button class="key-btn" data-key="X">X</button>
+                        <button class="key-btn" data-key="C">C</button>
+                        <button class="key-btn" data-key="V">V</button>
+                        <button class="key-btn" data-key="B">B</button>
+                        <button class="key-btn" data-key="N">N</button>
+                        <button class="key-btn" data-key="M">M</button>
+                    </div>
+                </div>
+                
+                <div id="game-message" class="game-message"></div>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Playful Browser Arcade</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const wordContainer = document.getElementById('word-container');
+            const hintText = document.getElementById('hint-text');
+            const gameMessage = document.getElementById('game-message');
+            const keyButtons = document.querySelectorAll('.key-btn');
+            const startBtn = document.getElementById('start-btn');
+            const categorySelect = document.getElementById('category-select');
+            const winsDisplay = document.getElementById('wins');
+            const lossesDisplay = document.getElementById('losses');
+            
+            // Hangman parts
+            const hangmanParts = [
+                document.getElementById('hangman-head'),
+                document.getElementById('hangman-body'),
+                document.getElementById('hangman-left-arm'),
+                document.getElementById('hangman-right-arm'),
+                document.getElementById('hangman-left-leg'),
+                document.getElementById('hangman-right-leg')
+            ];
+            
+            // Word categories
+            const words = {
+                animals: [
+                    { word: 'ELEPHANT', hint: 'Large mammal with a trunk' },
+                    { word: 'TIGER', hint: 'Striped big cat' },
+                    { word: 'DOLPHIN', hint: 'Intelligent marine mammal' },
+                    { word: 'PENGUIN', hint: 'Flightless bird that swims' },
+                    { word: 'GIRAFFE', hint: 'Animal with a very long neck' }
+                ],
+                fruits: [
+                    { word: 'BANANA', hint: 'Yellow curved fruit' },
+                    { word: 'STRAWBERRY', hint: 'Red fruit with seeds on the outside' },
+                    { word: 'PINEAPPLE', hint: 'Tropical fruit with spiky skin' },
+                    { word: 'WATERMELON', hint: 'Large green fruit with red inside' },
+                    { word: 'KIWI', hint: 'Small brown fruit with green inside' }
+                ],
+                countries: [
+                    { word: 'INDONESIA', hint: 'Largest island country in the world' },
+                    { word: 'BRAZIL', hint: 'Largest country in South America' },
+                    { word: 'AUSTRALIA', hint: 'Country that is also a continent' },
+                    { word: 'JAPAN', hint: 'Island nation known for sushi and anime' },
+                    { word: 'CANADA', hint: 'Second largest country by area' }
+                ],
+                sports: [
+                    { word: 'BASKETBALL', hint: 'Sport played with a hoop and ball' },
+                    { word: 'FOOTBALL', hint: 'Popular sport played with feet and a ball' },
+                    { word: 'TENNIS', hint: 'Sport played with rackets' },
+                    { word: 'SWIMMING', hint: 'Sport performed in water' },
+                    { word: 'BADMINTON', hint: 'Sport played with shuttlecocks' }
+                ]
+            };
+            
+            // Game variables
+            let currentWord = '';
+            let guessedLetters = [];
+            let wrongGuesses = 0;
+            let gameActive = false;
+            let wins = 0;
+            let losses = 0;
+            
+            // Initialize game
+            function initGame() {
+                // Reset variables
+                guessedLetters = [];
+                wrongGuesses = 0;
+                gameActive = true;
+                
+                // Reset keyboard
+                keyButtons.forEach(btn => {
+                    btn.classList.remove('correct', 'wrong');
+                    btn.disabled = false;
+                });
+                
+                // Hide hangman parts
+                hangmanParts.forEach(part => {
+                    part.style.visibility = 'hidden';
+                });
+                
+                // Hide game message
+                gameMessage.style.display = 'none';
+                
+                // Select random word from chosen category
+                const category = categorySelect.value;
+                const wordList = words[category];
+                const randomIndex = Math.floor(Math.random() * wordList.length);
+                const wordData = wordList[randomIndex];
+                
+                currentWord = wordData.word;
+                
+                // Display hint
+                hintText.textContent = `Hint: ${wordData.hint}`;
+                
+                // Create word display
+                wordContainer.innerHTML = '';
+                
+                for (let i = 0; i < currentWord.length; i++) {
+                    const letterSpan = document.createElement('span');
+                    letterSpan.className = 'letter-box';
+                    letterSpan.textContent = '_';
+                    wordContainer.appendChild(letterSpan);
+                }
+            }
+            
+            // Handle letter guess
+            function guessLetter(letter) {
+                if (!gameActive || guessedLetters.includes(letter)) return;
+                
+                guessedLetters.push(letter);
+                
+                // Check if letter is in the word
+                if (currentWord.includes(letter)) {
+                    // Correct guess
+                    updateWordDisplay(letter);
+                    
+                    // Mark button as correct
+                    document.querySelector(`.key-btn[data-key="${letter}"]`).classList.add('correct');
+                    
+                    // Check if word is complete
+                    if (isWordComplete()) {
+                        endGame(true);
+                    }
+                } else {
+                    // Wrong guess
+                    wrongGuesses++;
+                    
+                    // Show hangman part
+                    if (wrongGuesses <= hangmanParts.length) {
+                        hangmanParts[wrongGuesses - 1].style.visibility = 'visible';
+                    }
+                    
+                    // Mark button as wrong
+                    document.querySelector(`.key-btn[data-key="${letter}"]`).classList.add('wrong');
+                    
+                    // Check if game over
+                    if (wrongGuesses >= hangmanParts.length) {
+                        endGame(false);
+                    }
+                }
+            }
+            
+            // Update word display
+            function updateWordDisplay(letter) {
+                const letterBoxes = wordContainer.querySelectorAll('.letter-box');
+                
+                for (let i = 0; i < currentWord.length; i++) {
+                    if (currentWord[i] === letter) {
+                        letterBoxes[i].textContent = letter;
+                    }
+                }
+            }
+            
+            // Check if word is complete
+            function isWordComplete() {
+                const letterBoxes = wordContainer.querySelectorAll('.letter-box');
+                
+                for (let i = 0; i < letterBoxes.length; i++) {
+                    if (letterBoxes[i].textContent === '_') {
+                        return false;
+                    }
+                }
+                
+                return true;
+            }
+            
+            // End game function
+            function endGame(won) {
+                gameActive = false;
+                
+                // Disable all keys
+                keyButtons.forEach(btn => {
+                    btn.disabled = true;
+                });
+                
+                // Show message
+                gameMessage.style.display = 'block';
+                
+                if (won) {
+                    wins++;
+                    winsDisplay.textContent = wins;
+                    gameMessage.textContent = 'Congratulations! You guessed the word!';
+                    gameMessage.className = 'game-message win';
+                } else {
+                    losses++;
+                    lossesDisplay.textContent = losses;
+                    gameMessage.textContent = `Game over! The word was: ${currentWord}`;
+                    gameMessage.className = 'game-message lose';
+                    
+                    // Reveal word
+                    const letterBoxes = wordContainer.querySelectorAll('.letter-box');
+                    
+                    for (let i = 0; i < currentWord.length; i++) {
+                        letterBoxes[i].textContent = currentWord[i];
+                    }
+                }
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', initGame);
+            
+            keyButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    if (!gameActive) return;
+                    
+                    const letter = this.getAttribute('data-key');
+                    guessLetter(letter);
+                });
+            });
+            
+            // Keyboard events
+            document.addEventListener('keydown', function(e) {
+                if (!gameActive) return;
+                
+                const key = e.key.toUpperCase();
+                if (/^[A-Z]$/.test(key)) {
+                    guessLetter(key);
+                }
+            });
+            
+            // Initialize game on load
+            initGame();
+        });
+    </script>
+    
+    <style>
+        /* Game specific styles */
+        .hangman-game {
+            width: 100%;
+            padding: 20px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 20px;
+            position: relative;
+        }
+        
+        .hangman-container {
+            display: flex;
+            justify-content: center;
+        }
+        
+        .word-display {
+            text-align: center;
+        }
+        
+        .word-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .letter-box {
+            width: 30px;
+            height: 40px;
+            border-bottom: 3px solid var(--text);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .hint-text {
+            color: var(--text-light);
+            font-style: italic;
+        }
+        
+        .keyboard {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .keyboard-row {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .key-btn {
+            width: 35px;
+            height: 40px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .key-btn:hover:not(:disabled) {
+            background-color: var(--primary-dark);
+        }
+        
+        .key-btn.correct {
+            background-color: #4CAF50;
+        }
+        
+        .key-btn.wrong {
+            background-color: #F44336;
+        }
+        
+        .key-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.8;
+        }
+        
+        .game-message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .game-message.win {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .game-message.lose {
+            background-color: #F44336;
+            color: white;
+        }
+        
+        .category-select {
+            display: inline-block;
+            margin-left: 10px;
+        }
+        
+        .category-select select {
+            padding: 8px 12px;
+            border-radius: 25px;
+            border: 1px solid var(--border);
+            background-color: var(--card-bg);
+            color: var(--text);
+        }
+        
+        @media (min-width: 768px) {
+            .hangman-game {
+                grid-template-columns: 250px 1fr;
+                grid-template-rows: auto auto;
+            }
+            
+            .hangman-container {
+                grid-row: 1 / 3;
+            }
+            
+            .word-display {
+                grid-column: 2;
+                grid-row: 1;
+            }
+            
+            .keyboard {
+                grid-column: 2;
+                grid-row: 2;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .letter-box {
+                width: 25px;
+                height: 35px;
+                font-size: 1.2rem;
+            }
+            
+            .key-btn {
+                width: 28px;
+                height: 35px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</body>
+</html>

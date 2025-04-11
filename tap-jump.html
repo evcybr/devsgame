@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tap to Jump - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Tap to Jump</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Tap or press Space to jump over obstacles!</h2>
+            <div class="score-board">
+                <span>Score: <span id="score">0</span></span>
+                <span style="margin-left: 20px;">High Score: <span id="high-score">0</span></span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Game</button>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <canvas id="jump-canvas" width="800" height="300"></canvas>
+        </div>
+        
+        <div class="mobile-controls">
+            <button id="jump-btn" class="control-btn">Tap to Jump</button>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const canvas = document.getElementById('jump-canvas');
+            const ctx = canvas.getContext('2d');
+            const startBtn = document.getElementById('start-btn');
+            const jumpBtn = document.getElementById('jump-btn');
+            const scoreDisplay = document.getElementById('score');
+            const highScoreDisplay = document.getElementById('high-score');
+            
+            // Resize canvas to fit container
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const containerWidth = container.clientWidth;
+                
+                // Keep aspect ratio
+                if (containerWidth < 800) {
+                    const ratio = canvas.height / canvas.width;
+                    canvas.width = containerWidth - 20; // Add some padding
+                    canvas.height = canvas.width * ratio;
+                }
+            }
+            
+            // Call resize on load
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Game variables
+            let score = 0;
+            let highScore = localStorage.getItem('tapJumpHighScore') || 0;
+            let gameSpeed = 6;
+            let gameActive = false;
+            let animationId = null;
+            
+            // Display high score
+            highScoreDisplay.textContent = highScore;
+            
+            // Character
+            const character = {
+                x: 50,
+                y: canvas.height - 80,
+                width: 40,
+                height: 60,
+                jumping: false,
+                jumpHeight: 15,
+                jumpVelocity: 0,
+                gravity: 0.8
+            };
+            
+            // Obstacles array
+            let obstacles = [];
+            
+            // Create obstacle
+            function createObstacle() {
+                const height = Math.random() * 50 + 20; // Random height between 20 and 70
+                
+                return {
+                    x: canvas.width,
+                    y: canvas.height - height,
+                    width: 30,
+                    height: height,
+                    passed: false
+                };
+            }
+            
+            // Draw character
+            function drawCharacter() {
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+                
+                // Draw body
+                ctx.fillRect(
+                    character.x,
+                    character.y,
+                    character.width,
+                    character.height
+                );
+                
+                // Draw eyes
+                ctx.fillStyle = 'white';
+                ctx.fillRect(
+                    character.x + character.width - 15,
+                    character.y + 10,
+                    10,
+                    10
+                );
+                
+                // Draw pupils
+                ctx.fillStyle = 'black';
+                ctx.fillRect(
+                    character.x + character.width - 10,
+                    character.y + 12,
+                    5,
+                    5
+                );
+            }
+            
+            // Draw obstacle
+            function drawObstacle(obstacle) {
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+                ctx.fillRect(
+                    obstacle.x,
+                    obstacle.y,
+                    obstacle.width,
+                    obstacle.height
+                );
+                
+                // Add some detail to the obstacle
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                ctx.fillRect(
+                    obstacle.x + 5,
+                    obstacle.y + 5,
+                    obstacle.width - 10,
+                    10
+                );
+            }
+            
+            // Draw ground
+            function drawGround() {
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-light');
+                ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+                
+                // Add texture to the ground
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+                for (let i = 0; i < canvas.width; i += 30) {
+                    ctx.fillRect(i, canvas.height - 18, 20, 2);
+                }
+            }
+            
+            // Check collision
+            function checkCollision(char, obst) {
+                return (
+                    char.x < obst.x + obst.width &&
+                    char.x + char.width > obst.x &&
+                    char.y < obst.y + obst.height &&
+                    char.y + char.height > obst.y
+                );
+            }
+            
+            // Jump function
+            function jump() {
+                if (!character.jumping && gameActive) {
+                    character.jumping = true;
+                    character.jumpVelocity = -character.jumpHeight;
+                }
+            }
+            
+            // Update game state
+            function update() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw background
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Update character position if jumping
+                if (character.jumping) {
+                    character.y += character.jumpVelocity;
+                    character.jumpVelocity += character.gravity;
+                    
+                    // Check if landed
+                    if (character.y >= canvas.height - 80) {
+                        character.y = canvas.height - 80;
+                        character.jumping = false;
+                        character.jumpVelocity = 0;
+                    }
+                }
+                
+                // Create new obstacle if needed
+                if (obstacles.length === 0 || 
+                    obstacles[obstacles.length - 1].x < canvas.width - 300) {
+                    obstacles.push(createObstacle());
+                }
+                
+                // Update and draw obstacles
+                for (let i = 0; i < obstacles.length; i++) {
+                    obstacles[i].x -= gameSpeed;
+                    
+                    // Check if obstacle is passed
+                    if (!obstacles[i].passed && obstacles[i].x + obstacles[i].width < character.x) {
+                        obstacles[i].passed = true;
+                        score++;
+                        scoreDisplay.textContent = score;
+                        
+                        // Increase game speed slightly
+                        if (score % 5 === 0) {
+                            gameSpeed += 0.5;
+                        }
+                    }
+                    
+                    // Check collision
+                    if (checkCollision(character, obstacles[i])) {
+                        gameOver();
+                        return;
+                    }
+                    
+                    // Draw obstacle
+                    drawObstacle(obstacles[i]);
+                    
+                    // Remove obstacle if off screen
+                    if (obstacles[i].x + obstacles[i].width < 0) {
+                        obstacles.splice(i, 1);
+                        i--;
+                    }
+                }
+                
+                // Draw ground
+                drawGround();
+                
+                // Draw character
+                drawCharacter();
+                
+                // Loop animation
+                if (gameActive) {
+                    animationId = requestAnimationFrame(update);
+                }
+            }
+            
+            // Start game
+            function startGame() {
+                if (gameActive) return;
+                
+                // Reset game state
+                score = 0;
+                gameSpeed = 6;
+                obstacles = [];
+                character.y = canvas.height - 80;
+                character.jumping = false;
+                
+                scoreDisplay.textContent = score;
+                
+                gameActive = true;
+                startBtn.textContent = 'Restart Game';
+                
+                // Start game loop
+                animationId = requestAnimationFrame(update);
+            }
+            
+            // Game over
+            function gameOver() {
+                gameActive = false;
+                cancelAnimationFrame(animationId);
+                
+                // Update high score
+                if (score > highScore) {
+                    highScore = score;
+                    highScoreDisplay.textContent = highScore;
+                    localStorage.setItem('tapJumpHighScore', highScore);
+                }
+                
+                // Show game over message
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Poppins';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 30);
+                
+                ctx.font = '20px Poppins';
+                ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+                ctx.fillText('Press Start to play again', canvas.width / 2, canvas.height / 2 + 50);
+                
+                startBtn.textContent = 'Start Game';
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startGame);
+            
+            // Keyboard control
+            document.addEventListener('keydown', function(e) {
+                if (e.code === 'Space') {
+                    e.preventDefault(); // Prevent scrolling
+                    jump();
+                }
+            });
+            
+            // Mobile control
+            jumpBtn.addEventListener('click', jump);
+            canvas.addEventListener('click', jump);
+            canvas.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                jump();
+            });
+            
+            // Initial draw
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawGround();
+            drawCharacter();
+        });
+    </script>
+    
+    <style>
+        /* Game specific styles */
+        #jump-canvas {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            max-width: 100%;
+            display: block;
+            margin: 0 auto;
+            border: 2px solid var(--primary);
+        }
+        
+        .mobile-controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .control-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+            background-color: var(--primary-dark);
+        }
+
+        @media (min-width: 768px) {
+            .mobile-controls {
+                display: none;
+            }
+        }
+    </style>
+</body>
+</html>

@@ -1,0 +1,442 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matching Emoji - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Matching Emoji</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Match the emojis to clear the board!</h2>
+            <div class="score-board">
+                <span>Moves: <span id="moves">0</span></span>
+                <span style="margin-left: 20px;">Pairs Found: <span id="pairs">0</span>/<span id="total-pairs">8</span></span>
+                <span style="margin-left: 20px;">Time: <span id="timer">00:00</span></span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">New Game</button>
+                <div class="difficulty-selector">
+                    <label for="difficulty">Difficulty:</label>
+                    <select id="difficulty">
+                        <option value="easy">Easy (4x4)</option>
+                        <option value="medium">Medium (5x4)</option>
+                        <option value="hard">Hard (6x4)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div id="emoji-board" class="emoji-board"></div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const emojiBoard = document.getElementById('emoji-board');
+            const startBtn = document.getElementById('start-btn');
+            const difficultySelector = document.getElementById('difficulty');
+            const movesDisplay = document.getElementById('moves');
+            const pairsDisplay = document.getElementById('pairs');
+            const totalPairsDisplay = document.getElementById('total-pairs');
+            const timerDisplay = document.getElementById('timer');
+            
+            // Game variables
+            let emojis = [];
+            let moves = 0;
+            let pairsFound = 0;
+            let totalPairs = 8;
+            let firstCard = null;
+            let secondCard = null;
+            let canFlip = true;
+            let gameStarted = false;
+            let gameTimer = null;
+            let startTime = 0;
+            
+            // Available emojis
+            const availableEmojis = [
+                '😀', '😍', '🤔', '😎',
+                '🙃', '🤩', '😋', '🤗',
+                '😁', '🤣', '😇', '😉',
+                '😜', '😂', '😊', '😄',
+                '🥰', '😆', '😌', '🤭',
+                '🤓', '👽', '👻', '🤖'
+            ];
+            
+            // Create board based on difficulty
+            function createBoard(difficulty) {
+                // Clear existing board
+                emojiBoard.innerHTML = '';
+                
+                // Set board dimensions
+                let cols = 4;
+                
+                switch(difficulty) {
+                    case 'easy':
+                        cols = 4;
+                        totalPairs = 8;
+                        break;
+                    case 'medium':
+                        cols = 5;
+                        totalPairs = 10;
+                        break;
+                    case 'hard':
+                        cols = 6;
+                        totalPairs = 12;
+                        break;
+                }
+                
+                // Update total pairs display
+                totalPairsDisplay.textContent = totalPairs;
+                
+                // Set grid columns
+                emojiBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+                
+                // Generate emoji pairs
+                generateEmojiPairs(totalPairs);
+                
+                // Create cards
+                emojis.forEach((emoji, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'emoji-card';
+                    card.dataset.index = index;
+                    
+                    const cardFront = document.createElement('div');
+                    cardFront.className = 'card-front';
+                    
+                    const cardBack = document.createElement('div');
+                    cardBack.className = 'card-back';
+                    cardBack.textContent = emoji;
+                    
+                    card.appendChild(cardFront);
+                    card.appendChild(cardBack);
+                    
+                    card.addEventListener('click', () => flipCard(card));
+                    
+                    emojiBoard.appendChild(card);
+                });
+            }
+            
+            // Generate emoji pairs
+            function generateEmojiPairs(numPairs) {
+                // Shuffle available emojis
+                const shuffledEmojis = [...availableEmojis].sort(() => 0.5 - Math.random());
+                
+                // Select emojis for this game
+                const selectedEmojis = shuffledEmojis.slice(0, numPairs);
+                
+                // Create pairs and shuffle
+                emojis = [...selectedEmojis, ...selectedEmojis].sort(() => 0.5 - Math.random());
+            }
+            
+            // Flip card
+            function flipCard(card) {
+                // Prevent flipping if animations are running or card is already flipped
+                if (!canFlip || card.classList.contains('flipped') || 
+                    firstCard && card.dataset.index === firstCard.dataset.index) {
+                    return;
+                }
+                
+                // Start timer on first move
+                if (!gameStarted && moves === 0) {
+                    startTimer();
+                    gameStarted = true;
+                }
+                
+                // Flip the card
+                card.classList.add('flipped');
+                
+                // Check if this is first or second card
+                if (!firstCard) {
+                    // First card
+                    firstCard = card;
+                } else {
+                    // Second card
+                    secondCard = card;
+                    
+                    // Increase moves
+                    moves++;
+                    movesDisplay.textContent = moves;
+                    
+                    // Check for match
+                    checkForMatch();
+                }
+            }
+            
+            // Check for match
+            function checkForMatch() {
+                // Get emojis from cards
+                const firstEmoji = emojis[firstCard.dataset.index];
+                const secondEmoji = emojis[secondCard.dataset.index];
+                
+                // Temporarily disable flipping
+                canFlip = false;
+                
+                if (firstEmoji === secondEmoji) {
+                    // Match found
+                    handleMatch();
+                } else {
+                    // No match
+                    handleNoMatch();
+                }
+            }
+            
+            // Handle match
+            function handleMatch() {
+                // Add matched class to cards
+                firstCard.classList.add('matched');
+                secondCard.classList.add('matched');
+                
+                // Increase pairs found
+                pairsFound++;
+                pairsDisplay.textContent = pairsFound;
+                
+                // Reset cards
+                resetCards();
+                
+                // Check for game completion
+                if (pairsFound === totalPairs) {
+                    endGame();
+                } else {
+                    // Enable flipping
+                    canFlip = true;
+                }
+            }
+            
+            // Handle no match
+            function handleNoMatch() {
+                // Wait a moment then flip cards back
+                setTimeout(() => {
+                    firstCard.classList.remove('flipped');
+                    secondCard.classList.remove('flipped');
+                    
+                    // Reset cards
+                    resetCards();
+                    
+                    // Enable flipping
+                    canFlip = true;
+                }, 1000);
+            }
+            
+            // Reset card selections
+            function resetCards() {
+                firstCard = null;
+                secondCard = null;
+            }
+            
+            // Start timer
+            function startTimer() {
+                // Reset timer
+                clearInterval(gameTimer);
+                
+                // Set start time
+                startTime = Date.now();
+                
+                // Update timer display
+                gameTimer = setInterval(updateTimer, 1000);
+            }
+            
+            // Update timer display
+            function updateTimer() {
+                const currentTime = Date.now();
+                const elapsedSeconds = Math.floor((currentTime - startTime) / 1000);
+                
+                const minutes = Math.floor(elapsedSeconds / 60);
+                const seconds = elapsedSeconds % 60;
+                
+                timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            // End game
+            function endGame() {
+                // Stop timer
+                clearInterval(gameTimer);
+                
+                // Calculate final time
+                const finalTime = timerDisplay.textContent;
+                
+                // Show victory message
+                setTimeout(() => {
+                    alert(`Congratulations! You found all ${totalPairs} pairs in ${moves} moves and ${finalTime}!`);
+                }, 500);
+            }
+            
+            // Start a new game
+            function newGame() {
+                // Reset game state
+                moves = 0;
+                pairsFound = 0;
+                firstCard = null;
+                secondCard = null;
+                canFlip = true;
+                gameStarted = false;
+                
+                // Reset displays
+                movesDisplay.textContent = moves;
+                pairsDisplay.textContent = pairsFound;
+                timerDisplay.textContent = '00:00';
+                
+                // Stop timer
+                clearInterval(gameTimer);
+                
+                // Get difficulty
+                const difficulty = difficultySelector.value;
+                
+                // Create new board
+                createBoard(difficulty);
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', newGame);
+            difficultySelector.addEventListener('change', newGame);
+            
+            // Initialize game
+            createBoard('easy');
+        });
+    </script>
+    
+    <style>
+        /* Matching Emoji Game specific styles */
+        .emoji-board {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .emoji-card {
+            aspect-ratio: 1;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        
+        .emoji-card.flipped {
+            transform: rotateY(180deg);
+        }
+        
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .card-front {
+            background-color: var(--primary);
+            border: 3px solid var(--primary-dark);
+            box-shadow: 0 3px 10px var(--shadow);
+        }
+        
+        .card-front::after {
+            content: "?";
+            font-size: 2rem;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: bold;
+        }
+        
+        .card-back {
+            background-color: var(--card-bg);
+            transform: rotateY(180deg);
+            font-size: 2rem;
+            border: 3px solid var(--primary);
+        }
+        
+        .emoji-card.matched .card-back {
+            background-color: rgba(76, 175, 80, 0.2);
+            border-color: #4CAF50;
+        }
+        
+        .difficulty-selector {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 15px;
+        }
+        
+        .difficulty-selector label {
+            margin-right: 10px;
+        }
+        
+        .difficulty-selector select {
+            padding: 8px 15px;
+            border-radius: 25px;
+            border: 2px solid var(--primary);
+            background-color: var(--card-bg);
+            color: var(--text);
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+        }
+        
+        /* Responsive design */
+        @media (max-width: 600px) {
+            .emoji-board {
+                gap: 5px;
+            }
+            
+            .card-front::after {
+                font-size: 1.5rem;
+            }
+            
+            .card-back {
+                font-size: 1.5rem;
+            }
+            
+            .game-controls {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .difficulty-selector {
+                margin-left: 0;
+            }
+        }
+    </style>
+</body>
+</html>

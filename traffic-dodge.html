@@ -1,0 +1,401 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Traffic Dodge Game - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Traffic Dodge Game</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Navigate through busy traffic without crashing!</h2>
+            <div class="score-board">
+                <span>Score: <span id="score">0</span></span>
+                <span style="margin-left: 20px;">High Score: <span id="high-score">0</span></span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Game</button>
+                <button id="restart-btn" class="game-btn" style="display: none;">Restart</button>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div id="game-area" class="traffic-game">
+                <div id="road" class="road">
+                    <div class="lane-marker"></div>
+                    <div class="lane-marker"></div>
+                    <div class="lane-marker"></div>
+                </div>
+                <div id="player-car" class="car player-car"></div>
+                <div id="game-over" class="game-over">
+                    <h2>Game Over</h2>
+                    <p>Click Restart to play again</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mobile-controls">
+            <div class="control-buttons">
+                <button id="left-btn" class="control-btn"><i class="fas fa-arrow-left"></i></button>
+                <button id="right-btn" class="control-btn"><i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Playful Browser Arcade</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const gameArea = document.getElementById('game-area');
+            const playerCar = document.getElementById('player-car');
+            const road = document.getElementById('road');
+            const startBtn = document.getElementById('start-btn');
+            const restartBtn = document.getElementById('restart-btn');
+            const scoreDisplay = document.getElementById('score');
+            const highScoreDisplay = document.getElementById('high-score');
+            const gameOverScreen = document.getElementById('game-over');
+            const leftBtn = document.getElementById('left-btn');
+            const rightBtn = document.getElementById('right-btn');
+            
+            // Game variables
+            let score = 0;
+            let highScore = localStorage.getItem('trafficDodgeHighScore') || 0;
+            let isGameActive = false;
+            let carSpeed = 5;
+            let roadSpeed = 5;
+            let trafficInterval;
+            let scoreInterval;
+            let animationInterval;
+            let playerPosition = 1; // 0: left, 1: middle, 2: right
+            let lanes = [0.16, 0.5, 0.83]; // Lane positions (percentage)
+            let cars = [];
+            
+            highScoreDisplay.textContent = highScore;
+            gameOverScreen.style.display = 'none';
+            
+            // Position player car
+            function positionPlayerCar() {
+                playerCar.style.left = `calc(${lanes[playerPosition] * 100}% - 25px)`;
+            }
+            
+            // Create traffic car
+            function createTrafficCar() {
+                if (!isGameActive) return;
+                
+                // Create car element
+                const car = document.createElement('div');
+                car.className = 'car traffic-car';
+                
+                // Random lane
+                const lane = Math.floor(Math.random() * 3);
+                car.style.left = `calc(${lanes[lane] * 100}% - 25px)`;
+                
+                // Random car color
+                const colors = ['#e74c3c', '#3498db', '#2ecc71', '#f39c12', '#9b59b6'];
+                car.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Add to road
+                road.appendChild(car);
+                
+                // Add to cars array
+                cars.push({
+                    element: car,
+                    lane: lane,
+                    position: -100 // Start above the visible road
+                });
+                
+                // Schedule next car
+                const nextCarTime = Math.random() * 1500 + 500;
+                setTimeout(createTrafficCar, nextCarTime);
+            }
+            
+            // Move traffic
+            function moveTraffic() {
+                for (let i = cars.length - 1; i >= 0; i--) {
+                    const car = cars[i];
+                    car.position += roadSpeed;
+                    car.element.style.top = `${car.position}px`;
+                    
+                    // Check if car is off screen
+                    if (car.position > gameArea.offsetHeight) {
+                        road.removeChild(car.element);
+                        cars.splice(i, 1);
+                    }
+                    
+                    // Check collision with player
+                    if (isColliding(playerCar, car.element)) {
+                        gameOver();
+                    }
+                }
+            }
+            
+            // Collision detection
+            function isColliding(el1, el2) {
+                const rect1 = el1.getBoundingClientRect();
+                const rect2 = el2.getBoundingClientRect();
+                
+                return (
+                    rect1.left < rect2.right &&
+                    rect1.right > rect2.left &&
+                    rect1.top < rect2.bottom &&
+                    rect1.bottom > rect2.top
+                );
+            }
+            
+            // Animate road markers
+            function animateRoad() {
+                const laneMarkers = document.querySelectorAll('.lane-marker');
+                laneMarkers.forEach(marker => {
+                    const currentTop = parseInt(getComputedStyle(marker).top);
+                    let newTop = currentTop + roadSpeed;
+                    
+                    if (newTop > gameArea.offsetHeight) {
+                        newTop = -50;
+                    }
+                    
+                    marker.style.top = `${newTop}px`;
+                });
+            }
+            
+            // Move player car
+            function movePlayerCar(direction) {
+                if (!isGameActive) return;
+                
+                if (direction === 'left' && playerPosition > 0) {
+                    playerPosition--;
+                } else if (direction === 'right' && playerPosition < 2) {
+                    playerPosition++;
+                }
+                
+                positionPlayerCar();
+            }
+            
+            // Start game
+            function startGame() {
+                isGameActive = true;
+                score = 0;
+                scoreDisplay.textContent = score;
+                carSpeed = 5;
+                roadSpeed = 5;
+                
+                // Clear any existing cars
+                cars.forEach(car => car.element.remove());
+                cars = [];
+                
+                // Hide game over screen
+                gameOverScreen.style.display = 'none';
+                
+                // Show restart button
+                startBtn.style.display = 'none';
+                restartBtn.style.display = 'inline-block';
+                
+                // Position player car
+                playerPosition = 1;
+                positionPlayerCar();
+                
+                // Start creating traffic
+                createTrafficCar();
+                
+                // Start animation loop
+                animationInterval = setInterval(() => {
+                    moveTraffic();
+                    animateRoad();
+                }, 30);
+                
+                // Update score
+                scoreInterval = setInterval(() => {
+                    score++;
+                    scoreDisplay.textContent = score;
+                    
+                    // Increase difficulty every 20 points
+                    if (score % 20 === 0) {
+                        roadSpeed += 0.5;
+                    }
+                }, 100);
+            }
+            
+            // Game over
+            function gameOver() {
+                isGameActive = false;
+                
+                clearInterval(animationInterval);
+                clearInterval(scoreInterval);
+                
+                // Update high score
+                if (score > highScore) {
+                    highScore = score;
+                    highScoreDisplay.textContent = highScore;
+                    localStorage.setItem('trafficDodgeHighScore', highScore);
+                }
+                
+                // Show game over screen
+                gameOverScreen.style.display = 'flex';
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startGame);
+            restartBtn.addEventListener('click', startGame);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowLeft') {
+                    movePlayerCar('left');
+                } else if (e.key === 'ArrowRight') {
+                    movePlayerCar('right');
+                }
+            });
+            
+            // Mobile controls
+            leftBtn.addEventListener('click', () => movePlayerCar('left'));
+            rightBtn.addEventListener('click', () => movePlayerCar('right'));
+            
+            leftBtn.addEventListener('touchstart', () => movePlayerCar('left'));
+            rightBtn.addEventListener('touchstart', () => movePlayerCar('right'));
+        });
+    </script>
+    
+    <style>
+        /* Game specific styles */
+        .traffic-game {
+            width: 100%;
+            height: 400px;
+            position: relative;
+            background-color: #444;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .road {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background-color: #333;
+            overflow: hidden;
+        }
+        
+        .lane-marker {
+            position: absolute;
+            width: 10px;
+            height: 50px;
+            background-color: white;
+            left: calc(33.33% - 5px);
+            top: 50px;
+        }
+        
+        .lane-marker:nth-child(2) {
+            left: calc(66.66% - 5px);
+            top: 150px;
+        }
+        
+        .lane-marker:nth-child(3) {
+            left: calc(33.33% - 5px);
+            top: 250px;
+        }
+        
+        .car {
+            position: absolute;
+            width: 50px;
+            height: 80px;
+            border-radius: 10px;
+        }
+        
+        .player-car {
+            bottom: 20px;
+            background-color: var(--primary);
+            z-index: 2;
+            transition: left 0.2s ease;
+        }
+        
+        .traffic-car {
+            position: absolute;
+            top: -100px;
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            color: white;
+            display: none;
+        }
+        
+        .control-buttons {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 1.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        .control-btn:active {
+            background-color: var(--primary-dark);
+            transform: scale(0.95);
+        }
+        
+        @media (min-width: 768px) {
+            .mobile-controls {
+                display: none;
+            }
+        }
+    </style>
+</body>
+</html>

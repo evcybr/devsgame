@@ -1,0 +1,276 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction Time Test - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Reaction Time Test</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Test your reaction speed! Click when the color changes.</h2>
+            <div class="score-board">
+                <span>Current: <span id="current-time">0</span>ms</span>
+                <span style="margin-left: 20px;">Best: <span id="best-time">0</span>ms</span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Test</button>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div id="reaction-box" class="reaction-box waiting">
+                <p id="reaction-text">Click to start, then click again when the color changes!</p>
+            </div>
+        </div>
+        
+        <div class="stats-container">
+            <h3>Your last 5 attempts:</h3>
+            <ul id="attempts-list" class="attempts-list"></ul>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const reactionBox = document.getElementById('reaction-box');
+            const reactionText = document.getElementById('reaction-text');
+            const startBtn = document.getElementById('start-btn');
+            const currentTimeDisplay = document.getElementById('current-time');
+            const bestTimeDisplay = document.getElementById('best-time');
+            const attemptsList = document.getElementById('attempts-list');
+            
+            // Game variables
+            let state = 'waiting';
+            let startTime = 0;
+            let endTime = 0;
+            let timeoutId = null;
+            let bestTime = localStorage.getItem('reactionBestTime') || 0;
+            let lastAttempts = JSON.parse(localStorage.getItem('reactionLastAttempts') || '[]');
+            
+            // Update best time display
+            if (bestTime > 0) {
+                bestTimeDisplay.textContent = bestTime;
+            } else {
+                bestTimeDisplay.textContent = '-';
+            }
+            
+            // Display last attempts
+            function updateAttemptsList() {
+                attemptsList.innerHTML = '';
+                
+                if (lastAttempts.length === 0) {
+                    const li = document.createElement('li');
+                    li.textContent = 'No attempts yet';
+                    attemptsList.appendChild(li);
+                    return;
+                }
+                
+                lastAttempts.forEach((time, index) => {
+                    const li = document.createElement('li');
+                    li.textContent = `Attempt ${index + 1}: ${time}ms`;
+                    attemptsList.appendChild(li);
+                });
+            }
+            
+            // Initialize last attempts list
+            updateAttemptsList();
+            
+            // Start a new test
+            function startTest() {
+                state = 'ready';
+                reactionBox.className = 'reaction-box ready';
+                reactionText.textContent = 'Wait for green...';
+                
+                // Random delay between 1-5 seconds
+                const delay = Math.floor(Math.random() * 4000) + 1000;
+                
+                timeoutId = setTimeout(() => {
+                    state = 'waiting-for-click';
+                    startTime = Date.now();
+                    reactionBox.className = 'reaction-box go';
+                    reactionText.textContent = 'CLICK NOW!';
+                }, delay);
+            }
+            
+            // Handle click on the reaction box
+            function handleClick() {
+                if (state === 'waiting') {
+                    // Start the test
+                    startTest();
+                } else if (state === 'ready') {
+                    // Clicked too early
+                    clearTimeout(timeoutId);
+                    state = 'waiting';
+                    reactionBox.className = 'reaction-box waiting';
+                    reactionText.textContent = 'Too early! Click to try again.';
+                } else if (state === 'waiting-for-click') {
+                    // Get reaction time
+                    endTime = Date.now();
+                    const reactionTime = endTime - startTime;
+                    
+                    // Update displays
+                    currentTimeDisplay.textContent = reactionTime;
+                    
+                    // Update best time
+                    if (bestTime === 0 || reactionTime < bestTime) {
+                        bestTime = reactionTime;
+                        bestTimeDisplay.textContent = bestTime;
+                        localStorage.setItem('reactionBestTime', bestTime);
+                    }
+                    
+                    // Update last attempts
+                    lastAttempts.unshift(reactionTime);
+                    if (lastAttempts.length > 5) {
+                        lastAttempts.pop();
+                    }
+                    localStorage.setItem('reactionLastAttempts', JSON.stringify(lastAttempts));
+                    updateAttemptsList();
+                    
+                    // Show result
+                    state = 'waiting';
+                    reactionBox.className = 'reaction-box result';
+                    
+                    let resultMessage = '';
+                    if (reactionTime < 200) {
+                        resultMessage = `Incredible! ${reactionTime}ms`;
+                    } else if (reactionTime < 300) {
+                        resultMessage = `Excellent! ${reactionTime}ms`;
+                    } else if (reactionTime < 400) {
+                        resultMessage = `Great! ${reactionTime}ms`;
+                    } else if (reactionTime < 500) {
+                        resultMessage = `Good! ${reactionTime}ms`;
+                    } else {
+                        resultMessage = `${reactionTime}ms - Keep practicing!`;
+                    }
+                    
+                    reactionText.textContent = `${resultMessage} Click to try again.`;
+                }
+            }
+            
+            // Event listeners
+            reactionBox.addEventListener('click', handleClick);
+            
+            startBtn.addEventListener('click', function() {
+                if (state !== 'waiting-for-click') {
+                    state = 'waiting';
+                    reactionBox.className = 'reaction-box waiting';
+                    reactionText.textContent = 'Click to start, then click again when the color changes!';
+                    startTest();
+                }
+            });
+        });
+    </script>
+    
+    <style>
+        /* Game specific styles */
+        .reaction-box {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background-color 0.1s;
+            user-select: none;
+        }
+        
+        .reaction-box p {
+            font-size: 1.5rem;
+            text-align: center;
+            padding: 0 20px;
+        }
+        
+        .reaction-box.waiting {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .reaction-box.ready {
+            background-color: #F44336;
+            color: white;
+        }
+        
+        .reaction-box.go {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .reaction-box.result {
+            background-color: var(--card-bg);
+            color: var(--text);
+            border: 2px solid var(--primary);
+        }
+        
+        .stats-container {
+            margin-top: 30px;
+            text-align: center;
+        }
+        
+        .attempts-list {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .attempts-list li {
+            background-color: var(--card-bg);
+            padding: 8px 15px;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px var(--shadow);
+        }
+        
+        @media (max-width: 600px) {
+            .reaction-box {
+                height: 200px;
+            }
+            
+            .reaction-box p {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</body>
+</html>

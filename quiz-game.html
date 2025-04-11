@@ -1,0 +1,615 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Game - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Quiz Game</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Test your knowledge with various questions!</h2>
+            <div class="score-board">
+                <span>Score: <span id="score">0</span></span>
+                <span style="margin-left: 20px;">Question: <span id="question-counter">0</span>/10</span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Quiz</button>
+                <div class="category-selector">
+                    <label for="quiz-category">Category:</label>
+                    <select id="quiz-category">
+                        <option value="any">Any Category</option>
+                        <option value="science">Science</option>
+                        <option value="history">History</option>
+                        <option value="geography">Geography</option>
+                        <option value="movies">Movies & TV</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div id="quiz-container" class="quiz-container">
+                <div id="welcome-screen" class="welcome-screen">
+                    <h3>Welcome to the Quiz Game!</h3>
+                    <p>Choose a category and click Start Quiz to begin.</p>
+                    <p>You'll face 10 questions. Good luck!</p>
+                </div>
+                
+                <div id="question-screen" class="question-screen" style="display: none;">
+                    <h3 id="question-text">Question goes here?</h3>
+                    <div id="answers-container" class="answers-container">
+                        <!-- Answers will be added here dynamically -->
+                    </div>
+                </div>
+                
+                <div id="results-screen" class="results-screen" style="display: none;">
+                    <h3>Quiz Completed!</h3>
+                    <p>Your final score: <span id="final-score">0</span>/10</p>
+                    <div id="result-message"></div>
+                    <button id="retry-btn" class="game-btn">Try Again</button>
+                </div>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const startBtn = document.getElementById('start-btn');
+            const retryBtn = document.getElementById('retry-btn');
+            const categorySelector = document.getElementById('quiz-category');
+            const scoreDisplay = document.getElementById('score');
+            const questionCounter = document.getElementById('question-counter');
+            const finalScoreDisplay = document.getElementById('final-score');
+            const resultMessage = document.getElementById('result-message');
+            
+            // Quiz screens
+            const welcomeScreen = document.getElementById('welcome-screen');
+            const questionScreen = document.getElementById('question-screen');
+            const resultsScreen = document.getElementById('results-screen');
+            
+            // Question elements
+            const questionText = document.getElementById('question-text');
+            const answersContainer = document.getElementById('answers-container');
+            
+            // Game variables
+            let questions = [];
+            let currentQuestionIndex = 0;
+            let score = 0;
+            let quizStarted = false;
+            
+            // Question sets by category
+            const questionSets = {
+                science: [
+                    {
+                        question: "What is the chemical symbol for gold?",
+                        answers: ["Au", "Ag", "Fe", "Gd"],
+                        correctIndex: 0
+                    },
+                    {
+                        question: "Which planet is known as the Red Planet?",
+                        answers: ["Venus", "Jupiter", "Mars", "Saturn"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "What is the hardest natural substance on Earth?",
+                        answers: ["Platinum", "Titanium", "Quartz", "Diamond"],
+                        correctIndex: 3
+                    },
+                    {
+                        question: "What is the largest organ in the human body?",
+                        answers: ["Brain", "Liver", "Skin", "Heart"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "How many bones are in the adult human body?",
+                        answers: ["186", "206", "226", "306"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which of these is NOT a state of matter?",
+                        answers: ["Solid", "Liquid", "Gas", "Element"],
+                        correctIndex: 3
+                    },
+                    {
+                        question: "What is the closest star to Earth?",
+                        answers: ["Proxima Centauri", "Alpha Centauri", "The Sun", "Polaris"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "What do bees collect and use to create honey?",
+                        answers: ["Nectar", "Sap", "Pollen", "Dew"],
+                        correctIndex: 0
+                    },
+                    {
+                        question: "Which element has the chemical symbol 'O'?",
+                        answers: ["Osmium", "Oxygen", "Oganesson", "Olivine"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "What is the study of fossils called?",
+                        answers: ["Archaeology", "Geology", "Paleontology", "Anthropology"],
+                        correctIndex: 2
+                    }
+                ],
+                history: [
+                    {
+                        question: "In which year did World War II end?",
+                        answers: ["1943", "1944", "1945", "1946"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "Who was the first President of the United States?",
+                        answers: ["Thomas Jefferson", "John Adams", "George Washington", "Benjamin Franklin"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "What ancient civilization built the pyramids of Giza?",
+                        answers: ["Greek", "Roman", "Maya", "Egyptian"],
+                        correctIndex: 3
+                    },
+                    {
+                        question: "The Cold War was fought between the United States and which other country?",
+                        answers: ["China", "Soviet Union", "Germany", "Japan"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Who was the famous nurse during the Crimean War?",
+                        answers: ["Clara Barton", "Florence Nightingale", "Mary Seacole", "Dorothea Dix"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "In which year did Christopher Columbus first arrive in the Americas?",
+                        answers: ["1492", "1498", "1512", "1520"],
+                        correctIndex: 0
+                    },
+                    {
+                        question: "Which empire was ruled by Genghis Khan?",
+                        answers: ["Ottoman Empire", "Persian Empire", "Mongol Empire", "Roman Empire"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "What event began on July 14, 1789?",
+                        answers: ["American Civil War", "French Revolution", "Industrial Revolution", "World War I"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which civilization created a writing system known as hieroglyphics?",
+                        answers: ["Mesopotamian", "Egyptian", "Indus Valley", "Chinese"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Who was the first woman to win a Nobel Prize?",
+                        answers: ["Marie Curie", "Rosalind Franklin", "Jane Goodall", "Ada Lovelace"],
+                        correctIndex: 0
+                    }
+                ],
+                geography: [
+                    {
+                        question: "What is the largest ocean on Earth?",
+                        answers: ["Atlantic Ocean", "Indian Ocean", "Arctic Ocean", "Pacific Ocean"],
+                        correctIndex: 3
+                    },
+                    {
+                        question: "Which country is home to the Great Barrier Reef?",
+                        answers: ["United States", "Brazil", "Australia", "Indonesia"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "What is the capital city of Japan?",
+                        answers: ["Seoul", "Beijing", "Tokyo", "Bangkok"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "Which mountain is the tallest in the world?",
+                        answers: ["K2", "Mount Everest", "Kilimanjaro", "Denali"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which river is the longest in the world?",
+                        answers: ["Amazon", "Nile", "Yangtze", "Mississippi"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which African country has the largest population?",
+                        answers: ["South Africa", "Egypt", "Nigeria", "Ethiopia"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "Which of these cities is NOT in Europe?",
+                        answers: ["Barcelona", "Prague", "Istanbul", "Cairo"],
+                        correctIndex: 3
+                    },
+                    {
+                        question: "What is the smallest country in the world?",
+                        answers: ["Monaco", "Vatican City", "Liechtenstein", "San Marino"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which desert is the largest in the world?",
+                        answers: ["Gobi", "Kalahari", "Sahara", "Antarctic"],
+                        correctIndex: 3
+                    },
+                    {
+                        question: "Through which country does the Equator NOT pass?",
+                        answers: ["Brazil", "Kenya", "Indonesia", "India"],
+                        correctIndex: 3
+                    }
+                ],
+                movies: [
+                    {
+                        question: "Which film won the Academy Award for Best Picture in 2020?",
+                        answers: ["1917", "Joker", "Parasite", "Once Upon a Time in Hollywood"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "Who played the character of Iron Man in the Marvel Cinematic Universe?",
+                        answers: ["Chris Evans", "Robert Downey Jr.", "Chris Hemsworth", "Mark Ruffalo"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which animated movie features a character named Elsa who can control ice and snow?",
+                        answers: ["Tangled", "Brave", "Moana", "Frozen"],
+                        correctIndex: 3
+                    },
+                    {
+                        question: "What is the name of the fictional African country in Black Panther?",
+                        answers: ["Zamunda", "Wakanda", "Genovia", "Latveria"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which TV series features a chemistry teacher who turns to manufacturing drugs?",
+                        answers: ["The Wire", "Breaking Bad", "Narcos", "Ozark"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Who directed the 1975 film 'Jaws'?",
+                        answers: ["Steven Spielberg", "George Lucas", "Martin Scorsese", "Francis Ford Coppola"],
+                        correctIndex: 0
+                    },
+                    {
+                        question: "Which movie features the line 'I'm the king of the world!'?",
+                        answers: ["The Lion King", "Titanic", "King Kong", "The Lord of the Rings"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "What is the name of Harry Potter's owl?",
+                        answers: ["Errol", "Crookshanks", "Hedwig", "Scabbers"],
+                        correctIndex: 2
+                    },
+                    {
+                        question: "Which actor played the Joker in 'The Dark Knight'?",
+                        answers: ["Jack Nicholson", "Heath Ledger", "Joaquin Phoenix", "Jared Leto"],
+                        correctIndex: 1
+                    },
+                    {
+                        question: "Which TV show features dragons and is based on books by George R.R. Martin?",
+                        answers: ["The Witcher", "Outlander", "Game of Thrones", "The Mandalorian"],
+                        correctIndex: 2
+                    }
+                ]
+            };
+            
+            // Mix all categories for the "any" option
+            const allQuestions = [
+                ...questionSets.science,
+                ...questionSets.history,
+                ...questionSets.geography,
+                ...questionSets.movies
+            ];
+            
+            // Fisher-Yates shuffle algorithm to shuffle questions
+            function shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            }
+            
+            // Get questions based on selected category
+            function getQuestions(category) {
+                let selectedQuestions = [];
+                
+                if (category === 'any') {
+                    // Shuffle all questions and take 10
+                    selectedQuestions = shuffleArray([...allQuestions]).slice(0, 10);
+                } else {
+                    // Shuffle category questions and take 10 (or all if less than 10)
+                    const categoryQuestions = questionSets[category] || [];
+                    selectedQuestions = shuffleArray([...categoryQuestions]).slice(0, 10);
+                }
+                
+                return selectedQuestions;
+            }
+            
+            // Display a question
+            function displayQuestion(question) {
+                questionText.textContent = question.question;
+                
+                // Clear previous answers
+                answersContainer.innerHTML = '';
+                
+                // Create answer buttons
+                question.answers.forEach((answer, index) => {
+                    const answerBtn = document.createElement('button');
+                    answerBtn.className = 'answer-btn';
+                    answerBtn.textContent = answer;
+                    
+                    answerBtn.addEventListener('click', () => handleAnswer(index, question.correctIndex));
+                    
+                    answersContainer.appendChild(answerBtn);
+                });
+                
+                // Update question counter
+                questionCounter.textContent = `${currentQuestionIndex + 1}/${questions.length}`;
+            }
+            
+            // Handle answer selection
+            function handleAnswer(selectedIndex, correctIndex) {
+                // Disable all buttons to prevent multiple answers
+                const answerButtons = document.querySelectorAll('.answer-btn');
+                answerButtons.forEach(btn => btn.disabled = true);
+                
+                // Highlight correct and incorrect answers
+                answerButtons[correctIndex].classList.add('correct');
+                
+                if (selectedIndex !== correctIndex) {
+                    answerButtons[selectedIndex].classList.add('incorrect');
+                } else {
+                    // Correct answer
+                    score++;
+                    scoreDisplay.textContent = score;
+                }
+                
+                // Move to next question after a delay
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    
+                    if (currentQuestionIndex < questions.length) {
+                        displayQuestion(questions[currentQuestionIndex]);
+                    } else {
+                        // End of quiz
+                        endQuiz();
+                    }
+                }, 1500);
+            }
+            
+            // Start the quiz
+            function startQuiz() {
+                if (quizStarted) return;
+                
+                // Get selected category
+                const category = categorySelector.value;
+                
+                // Get questions for selected category
+                questions = getQuestions(category);
+                
+                // Reset game state
+                currentQuestionIndex = 0;
+                score = 0;
+                scoreDisplay.textContent = score;
+                quizStarted = true;
+                
+                // Show question screen
+                welcomeScreen.style.display = 'none';
+                questionScreen.style.display = 'block';
+                resultsScreen.style.display = 'none';
+                
+                // Display first question
+                displayQuestion(questions[currentQuestionIndex]);
+                
+                // Update UI
+                startBtn.textContent = 'Quiz in Progress';
+                startBtn.disabled = true;
+                categorySelector.disabled = true;
+            }
+            
+            // End the quiz
+            function endQuiz() {
+                quizStarted = false;
+                
+                // Show results screen
+                welcomeScreen.style.display = 'none';
+                questionScreen.style.display = 'none';
+                resultsScreen.style.display = 'block';
+                
+                // Update final score
+                finalScoreDisplay.textContent = `${score}/${questions.length}`;
+                
+                // Display result message
+                let message = '';
+                const percentage = (score / questions.length) * 100;
+                
+                if (percentage === 100) {
+                    message = 'Perfect score! You\'re a quiz master!';
+                } else if (percentage >= 80) {
+                    message = 'Excellent job! You know your stuff!';
+                } else if (percentage >= 60) {
+                    message = 'Good work! You have solid knowledge.';
+                } else if (percentage >= 40) {
+                    message = 'Not bad, but there\'s room for improvement.';
+                } else {
+                    message = 'Keep learning and try again!';
+                }
+                
+                resultMessage.textContent = message;
+                
+                // Reset UI
+                startBtn.textContent = 'Start Quiz';
+                startBtn.disabled = false;
+                categorySelector.disabled = false;
+            }
+            
+            // Reset and restart the quiz
+            function restartQuiz() {
+                // Reset UI
+                welcomeScreen.style.display = 'block';
+                questionScreen.style.display = 'none';
+                resultsScreen.style.display = 'none';
+                
+                startBtn.textContent = 'Start Quiz';
+                startBtn.disabled = false;
+                categorySelector.disabled = false;
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startQuiz);
+            retryBtn.addEventListener('click', restartQuiz);
+        });
+    </script>
+    
+    <style>
+        /* Quiz Game specific styles */
+        .quiz-container {
+            width: 100%;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 5px 15px var(--shadow);
+        }
+        
+        .welcome-screen, .results-screen {
+            text-align: center;
+        }
+        
+        .welcome-screen h3, .results-screen h3 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+        
+        .welcome-screen p, .results-screen p {
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .question-screen h3 {
+            font-size: 1.5rem;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .answers-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+        }
+        
+        .answer-btn {
+            background-color: var(--secondary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 15px 20px;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+            text-align: left;
+        }
+        
+        .answer-btn:hover {
+            background-color: var(--primary);
+        }
+        
+        .answer-btn.correct {
+            background-color: #4CAF50;
+        }
+        
+        .answer-btn.incorrect {
+            background-color: #F44336;
+        }
+        
+        .category-selector {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 15px;
+        }
+        
+        .category-selector label {
+            margin-right: 10px;
+        }
+        
+        .category-selector select {
+            padding: 8px 15px;
+            border-radius: 25px;
+            border: 2px solid var(--primary);
+            background-color: var(--card-bg);
+            color: var(--text);
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+        }
+        
+        /* Medium screens */
+        @media (min-width: 768px) {
+            .answers-container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        
+        /* Small screens */
+        @media (max-width: 600px) {
+            .quiz-container {
+                padding: 20px 15px;
+            }
+            
+            .question-screen h3 {
+                font-size: 1.2rem;
+            }
+            
+            .answer-btn {
+                padding: 12px 15px;
+                font-size: 1rem;
+            }
+            
+            .game-controls {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .category-selector {
+                margin-left: 0;
+            }
+        }
+    </style>
+</body>
+</html>

@@ -1,0 +1,420 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Tic Tac Toe</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Classic X and O game against the computer!</h2>
+            <div id="status-message" class="status-message">You are X. Make your move!</div>
+            <div class="game-controls">
+                <button id="reset-btn" class="game-btn">New Game</button>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div class="ttt-game">
+                <div class="ttt-board" id="ttt-board">
+                    <div class="ttt-cell" data-index="0"></div>
+                    <div class="ttt-cell" data-index="1"></div>
+                    <div class="ttt-cell" data-index="2"></div>
+                    <div class="ttt-cell" data-index="3"></div>
+                    <div class="ttt-cell" data-index="4"></div>
+                    <div class="ttt-cell" data-index="5"></div>
+                    <div class="ttt-cell" data-index="6"></div>
+                    <div class="ttt-cell" data-index="7"></div>
+                    <div class="ttt-cell" data-index="8"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="score-display">
+            <div class="score-item">
+                <span class="score-label">You (X):</span>
+                <span id="player-score" class="score-value">0</span>
+            </div>
+            <div class="score-item">
+                <span class="score-label">Computer (O):</span>
+                <span id="computer-score" class="score-value">0</span>
+            </div>
+            <div class="score-item">
+                <span class="score-label">Ties:</span>
+                <span id="ties-score" class="score-value">0</span>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for saved theme preference
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const cells = document.querySelectorAll('.ttt-cell');
+            const statusMessage = document.getElementById('status-message');
+            const resetBtn = document.getElementById('reset-btn');
+            const playerScoreEl = document.getElementById('player-score');
+            const computerScoreEl = document.getElementById('computer-score');
+            const tiesScoreEl = document.getElementById('ties-score');
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            
+            let board = ['', '', '', '', '', '', '', '', ''];
+            let currentPlayer = 'X';
+            let gameActive = true;
+            
+            // Scores
+            let scores = {
+                player: 0,
+                computer: 0,
+                ties: 0
+            };
+            
+            // Load scores from localStorage if available
+            const savedScores = localStorage.getItem('tttScores');
+            if (savedScores) {
+                scores = JSON.parse(savedScores);
+                updateScoreDisplay();
+            }
+            
+            // Winning combinations
+            const winningCombinations = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
+                [0, 4, 8], [2, 4, 6]             // Diagonals
+            ];
+            
+            // Handle cell click
+            function handleCellClick(e) {
+                const cell = e.target;
+                const index = parseInt(cell.dataset.index);
+                
+                // Check if cell already filled or game not active
+                if (board[index] !== '' || !gameActive) {
+                    return;
+                }
+                
+                // Player's move
+                board[index] = currentPlayer;
+                cell.textContent = currentPlayer;
+                cell.classList.add('filled', 'player-x');
+                
+                // Check game state after player's move
+                if (checkWin()) {
+                    statusMessage.textContent = `You won! 🎉`;
+                    gameActive = false;
+                    scores.player++;
+                    saveScores();
+                    updateScoreDisplay();
+                    return;
+                }
+                
+                if (checkDraw()) {
+                    statusMessage.textContent = `It's a draw! 🤝`;
+                    gameActive = false;
+                    scores.ties++;
+                    saveScores();
+                    updateScoreDisplay();
+                    return;
+                }
+                
+                // Switch to computer's turn
+                currentPlayer = 'O';
+                statusMessage.textContent = `Computer is thinking... 🤔`;
+                
+                // Computer's move with a small delay
+                setTimeout(() => {
+                    makeComputerMove();
+                    
+                    // Check game state after computer's move
+                    if (checkWin()) {
+                        statusMessage.textContent = `Computer won! 😢`;
+                        gameActive = false;
+                        scores.computer++;
+                        saveScores();
+                        updateScoreDisplay();
+                        return;
+                    }
+                    
+                    if (checkDraw()) {
+                        statusMessage.textContent = `It's a draw! 🤝`;
+                        gameActive = false;
+                        scores.ties++;
+                        saveScores();
+                        updateScoreDisplay();
+                        return;
+                    }
+                    
+                    // Switch back to player's turn
+                    currentPlayer = 'X';
+                    statusMessage.textContent = `Your turn! 👉`;
+                }, 800);
+            }
+            
+            // Computer move
+            function makeComputerMove() {
+                // Check if computer can win
+                const winMove = findBestMove('O');
+                if (winMove !== -1) {
+                    makeMove(winMove);
+                    return;
+                }
+                
+                // Check if player can win and block
+                const blockMove = findBestMove('X');
+                if (blockMove !== -1) {
+                    makeMove(blockMove);
+                    return;
+                }
+                
+                // Try to take center
+                if (board[4] === '') {
+                    makeMove(4);
+                    return;
+                }
+                
+                // Take any available corner
+                const corners = [0, 2, 6, 8];
+                const availableCorners = corners.filter(index => board[index] === '');
+                if (availableCorners.length > 0) {
+                    const randomCorner = availableCorners[Math.floor(Math.random() * availableCorners.length)];
+                    makeMove(randomCorner);
+                    return;
+                }
+                
+                // Take any available side
+                const sides = [1, 3, 5, 7];
+                const availableSides = sides.filter(index => board[index] === '');
+                if (availableSides.length > 0) {
+                    const randomSide = availableSides[Math.floor(Math.random() * availableSides.length)];
+                    makeMove(randomSide);
+                    return;
+                }
+            }
+            
+            // Find best move for given player
+            function findBestMove(player) {
+                // Check each winning combination
+                for (const combination of winningCombinations) {
+                    const [a, b, c] = combination;
+                    
+                    // Check if player has two in a row and third is empty
+                    if (
+                        board[a] === player && 
+                        board[b] === player && 
+                        board[c] === '') {
+                        return c;
+                    }
+                    
+                    if (
+                        board[a] === player && 
+                        board[c] === player && 
+                        board[b] === '') {
+                        return b;
+                    }
+                    
+                    if (
+                        board[b] === player && 
+                        board[c] === player && 
+                        board[a] === '') {
+                        return a;
+                    }
+                }
+                
+                return -1; // No winning move found
+            }
+            
+            // Make a move at the given index
+            function makeMove(index) {
+                board[index] = currentPlayer;
+                cells[index].textContent = currentPlayer;
+                cells[index].classList.add('filled', currentPlayer === 'X' ? 'player-x' : 'player-o');
+            }
+            
+            // Check for win
+            function checkWin() {
+                for (const combination of winningCombinations) {
+                    const [a, b, c] = combination;
+                    
+                    if (
+                        board[a] !== '' &&
+                        board[a] === board[b] &&
+                        board[a] === board[c]
+                    ) {
+                        // Highlight winning cells
+                        cells[a].classList.add('win');
+                        cells[b].classList.add('win');
+                        cells[c].classList.add('win');
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            // Check for draw
+            function checkDraw() {
+                return !board.includes('');
+            }
+            
+            // Reset game
+            function resetGame() {
+                board = ['', '', '', '', '', '', '', '', ''];
+                currentPlayer = 'X';
+                gameActive = true;
+                
+                statusMessage.textContent = `You are X. Make your move!`;
+                
+                cells.forEach(cell => {
+                    cell.textContent = '';
+                    cell.className = 'ttt-cell';
+                });
+            }
+            
+            // Update score display
+            function updateScoreDisplay() {
+                playerScoreEl.textContent = scores.player;
+                computerScoreEl.textContent = scores.computer;
+                tiesScoreEl.textContent = scores.ties;
+            }
+            
+            // Save scores to localStorage
+            function saveScores() {
+                localStorage.setItem('tttScores', JSON.stringify(scores));
+            }
+            
+            // Theme toggle functionality
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+            
+            // Event listeners
+            cells.forEach(cell => {
+                cell.addEventListener('click', handleCellClick);
+            });
+            
+            resetBtn.addEventListener('click', resetGame);
+        });
+    </script>
+    
+    <style>
+        /* Tic Tac Toe specific styles */
+        .ttt-game {
+            padding: 20px;
+        }
+        
+        .ttt-board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        
+        .ttt-cell {
+            width: 100%;
+            aspect-ratio: 1;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid var(--primary);
+        }
+        
+        .ttt-cell:hover:not(.filled) {
+            background-color: var(--accent);
+            opacity: 0.7;
+        }
+        
+        .ttt-cell.player-x {
+            color: var(--primary);
+        }
+        
+        .ttt-cell.player-o {
+            color: var(--accent);
+        }
+        
+        .ttt-cell.win {
+            background-color: var(--primary);
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .status-message {
+            font-size: 1.5rem;
+            margin: 15px 0;
+            min-height: 40px;
+            color: var(--primary);
+            text-align: center;
+        }
+        
+        .score-display {
+            display: flex;
+            justify-content: space-around;
+            margin: 20px auto;
+            max-width: 400px;
+            background-color: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 5px 15px var(--shadow);
+        }
+        
+        .score-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .score-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+        }
+        
+        .score-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</body>
+</html>

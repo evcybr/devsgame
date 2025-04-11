@@ -1,0 +1,339 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simon Says - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Simon Says</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Repeat the pattern of lights and sounds!</h2>
+            <div class="score-board">
+                <span>Level: <span id="level">1</span></span>
+                <span style="margin-left: 20px;">High Score: <span id="high-score">0</span></span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Game</button>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div class="simon-game" id="simon-game">
+                <div class="simon-btn green" id="green"></div>
+                <div class="simon-btn red" id="red"></div>
+                <div class="simon-btn yellow" id="yellow"></div>
+                <div class="simon-btn blue" id="blue"></div>
+                <div class="simon-center" id="simon-center">
+                    <span>SIMON</span>
+                </div>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const greenBtn = document.getElementById('green');
+            const redBtn = document.getElementById('red');
+            const yellowBtn = document.getElementById('yellow');
+            const blueBtn = document.getElementById('blue');
+            const startBtn = document.getElementById('start-btn');
+            const levelDisplay = document.getElementById('level');
+            const highScoreDisplay = document.getElementById('high-score');
+            const simonCenter = document.getElementById('simon-center');
+            
+            // Get high score from local storage or default to 0
+            let highScore = localStorage.getItem('simonHighScore') || 0;
+            highScoreDisplay.textContent = highScore;
+            
+            // Game variables
+            const buttons = [greenBtn, redBtn, yellowBtn, blueBtn];
+            const buttonSounds = {
+                green: new Audio('https://s3.amazonaws.com/freecodecamp/simonSound1.mp3'),
+                red: new Audio('https://s3.amazonaws.com/freecodecamp/simonSound2.mp3'),
+                yellow: new Audio('https://s3.amazonaws.com/freecodecamp/simonSound3.mp3'),
+                blue: new Audio('https://s3.amazonaws.com/freecodecamp/simonSound4.mp3')
+            };
+            
+            let sequence = [];
+            let playerSequence = [];
+            let level = 1;
+            let isPlaying = false;
+            let canClick = false;
+            
+            // Start the game
+            function startGame() {
+                if (isPlaying) return;
+                
+                sequence = [];
+                playerSequence = [];
+                level = 1;
+                isPlaying = true;
+                
+                levelDisplay.textContent = level;
+                startBtn.textContent = 'Playing...';
+                simonCenter.classList.add('playing');
+                
+                setTimeout(() => {
+                    nextRound();
+                }, 1000);
+            }
+            
+            // Start the next round
+            function nextRound() {
+                playerSequence = [];
+                addToSequence();
+                playSequence();
+            }
+            
+            // Add a random button to the sequence
+            function addToSequence() {
+                const randomIndex = Math.floor(Math.random() * 4);
+                sequence.push(buttons[randomIndex]);
+            }
+            
+            // Play the current sequence
+            function playSequence() {
+                canClick = false;
+                let i = 0;
+                
+                const intervalId = setInterval(() => {
+                    if (i >= sequence.length) {
+                        clearInterval(intervalId);
+                        canClick = true;
+                        return;
+                    }
+                    
+                    const button = sequence[i];
+                    flashButton(button);
+                    i++;
+                }, 800);
+            }
+            
+            // Flash a button and play its sound
+            function flashButton(button) {
+                button.classList.add('active');
+                
+                // Play sound
+                const color = button.id;
+                if (buttonSounds[color]) {
+                    buttonSounds[color].currentTime = 0;
+                    buttonSounds[color].play();
+                }
+                
+                setTimeout(() => {
+                    button.classList.remove('active');
+                }, 400);
+            }
+            
+            // Handle button clicks
+            function handleButtonClick(e) {
+                if (!isPlaying || !canClick) return;
+                
+                const clickedButton = e.target;
+                flashButton(clickedButton);
+                playerSequence.push(clickedButton);
+                
+                // Check if the player's sequence matches so far
+                const index = playerSequence.length - 1;
+                if (playerSequence[index] !== sequence[index]) {
+                    gameOver();
+                    return;
+                }
+                
+                // Check if the player completed the sequence
+                if (playerSequence.length === sequence.length) {
+                    // Player completed the sequence
+                    level++;
+                    levelDisplay.textContent = level;
+                    
+                    // Update high score if needed
+                    if (level - 1 > highScore) {
+                        highScore = level - 1;
+                        highScoreDisplay.textContent = highScore;
+                        localStorage.setItem('simonHighScore', highScore);
+                    }
+                    
+                    setTimeout(() => {
+                        nextRound();
+                    }, 1000);
+                }
+            }
+            
+            // Game over
+            function gameOver() {
+                isPlaying = false;
+                startBtn.textContent = 'Start Game';
+                simonCenter.classList.remove('playing');
+                
+                // Play error sound/animation
+                buttons.forEach(btn => {
+                    btn.classList.add('error');
+                    setTimeout(() => {
+                        btn.classList.remove('error');
+                    }, 300);
+                });
+                
+                setTimeout(() => {
+                    alert(`Game Over! You reached level ${level}`);
+                }, 500);
+            }
+            
+            // Event Listeners
+            startBtn.addEventListener('click', startGame);
+            
+            buttons.forEach(button => {
+                button.addEventListener('click', handleButtonClick);
+            });
+        });
+    </script>
+    
+    <style>
+        /* Simon Game specific styles */
+        .simon-game {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto;
+            border-radius: 50%;
+            background-color: var(--text);
+            padding: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .simon-btn {
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            opacity: 0.8;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        
+        .simon-btn:hover {
+            opacity: 1;
+        }
+        
+        .simon-btn.active {
+            opacity: 1;
+            filter: brightness(1.5);
+            transform: scale(1.05);
+        }
+        
+        .simon-btn.error {
+            background-color: white !important;
+            opacity: 1;
+        }
+        
+        .green {
+            top: 10px;
+            left: 10px;
+            border-top-left-radius: 100%;
+            background-color: #4CAF50;
+        }
+        
+        .red {
+            top: 10px;
+            right: 10px;
+            border-top-right-radius: 100%;
+            background-color: #F44336;
+        }
+        
+        .yellow {
+            bottom: 10px;
+            left: 10px;
+            border-bottom-left-radius: 100%;
+            background-color: #FFEB3B;
+        }
+        
+        .blue {
+            bottom: 10px;
+            right: 10px;
+            border-bottom-right-radius: 100%;
+            background-color: #2196F3;
+        }
+        
+        .simon-center {
+            position: absolute;
+            width: 150px;
+            height: 150px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--card-bg);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text);
+            user-select: none;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.3s;
+        }
+        
+        .simon-center.playing {
+            background-color: var(--accent);
+            color: white;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 400px) {
+            .simon-game {
+                width: 280px;
+                height: 280px;
+            }
+            
+            .simon-btn {
+                width: 120px;
+                height: 120px;
+            }
+            
+            .simon-center {
+                width: 130px;
+                height: 130px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</body>
+</html>

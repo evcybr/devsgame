@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Switch - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Color Switch</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Switch colors to pass through obstacles!</h2>
+            <div class="score-board">
+                <span>Score: <span id="score">0</span></span>
+                <span style="margin-left: 20px;">High Score: <span id="high-score">0</span></span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Game</button>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <canvas id="game-canvas" width="400" height="600"></canvas>
+            <div class="mobile-controls">
+                <button id="switch-btn" class="control-btn">Switch Color</button>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const canvas = document.getElementById('game-canvas');
+            const ctx = canvas.getContext('2d');
+            const startBtn = document.getElementById('start-btn');
+            const switchBtn = document.getElementById('switch-btn');
+            const scoreDisplay = document.getElementById('score');
+            const highScoreDisplay = document.getElementById('high-score');
+            
+            // Resize canvas to fit container
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const containerWidth = container.clientWidth;
+                
+                if (containerWidth < 400) {
+                    const ratio = canvas.height / canvas.width;
+                    canvas.width = containerWidth - 20; // Add some padding
+                    canvas.height = canvas.width * ratio;
+                }
+            }
+            
+            // Call resize on load
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            
+            // Game variables
+            let score = 0;
+            let highScore = localStorage.getItem('colorSwitchHighScore') || 0;
+            let gameActive = false;
+            let animationId = null;
+            
+            // Game colors
+            const colors = [
+                '#FF416C', // Red
+                '#4CAF50', // Green
+                '#3498DB', // Blue
+                '#FFEB3B'  // Yellow
+            ];
+            
+            // Display high score
+            highScoreDisplay.textContent = highScore;
+            
+            // Player
+            const player = {
+                x: canvas.width / 2,
+                y: canvas.height - 100,
+                radius: 15,
+                colorIndex: 0,
+                color: colors[0],
+                velocity: 0,
+                gravity: 0.5,
+                jump: -10
+            };
+            
+            // Obstacles
+            const obstacles = [];
+            
+            // Create an obstacle
+            function createObstacle(y) {
+                // Randomize colors
+                const colorIndices = [0, 1, 2, 3];
+                
+                // Shuffle color indices
+                for (let i = colorIndices.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [colorIndices[i], colorIndices[j]] = [colorIndices[j], colorIndices[i]];
+                }
+                
+                return {
+                    y: y,
+                    radius: 100,
+                    width: 20,
+                    colorSegments: colorIndices,
+                    speed: 2,
+                    passed: false
+                };
+            }
+            
+            // Draw player
+            function drawPlayer() {
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+                ctx.fillStyle = player.color;
+                ctx.fill();
+                ctx.closePath();
+            }
+            
+            // Draw obstacle
+            function drawObstacle(obstacle) {
+                for (let i = 0; i < 4; i++) {
+                    ctx.beginPath();
+                    ctx.arc(canvas.width / 2, obstacle.y, obstacle.radius, 
+                        i * Math.PI / 2, (i + 1) * Math.PI / 2);
+                    ctx.lineTo(canvas.width / 2, obstacle.y);
+                    ctx.fillStyle = colors[obstacle.colorSegments[i]];
+                    ctx.fill();
+                    ctx.closePath();
+                }
+                
+                // Draw center hole
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, obstacle.y, obstacle.radius - obstacle.width, 0, Math.PI * 2);
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
+                ctx.fill();
+                ctx.closePath();
+            }
+            
+            // Check collision
+            function checkCollision(obstacle) {
+                // Check if player is within the obstacle's vertical range
+                const distance = Math.sqrt(
+                    Math.pow(canvas.width / 2 - player.x, 2) + 
+                    Math.pow(obstacle.y - player.y, 2)
+                );
+                
+                if (distance > obstacle.radius || distance < obstacle.radius - obstacle.width) {
+                    // No collision (player is outside the obstacle or in the hole)
+                    return false;
+                } else {
+                    // Player is within the obstacle, check color
+                    // Calculate angle to determine which segment
+                    const angle = Math.atan2(player.y - obstacle.y, player.x - canvas.width / 2);
+                    let segment = Math.floor((angle + Math.PI) / (Math.PI / 2)) % 4;
+                    
+                    // Check if player color matches segment color
+                    return obstacle.colorSegments[segment] !== player.colorIndex;
+                }
+            }
+            
+            // Switch player color
+            function switchColor() {
+                player.colorIndex = (player.colorIndex + 1) % colors.length;
+                player.color = colors[player.colorIndex];
+            }
+            
+            // Jump function
+            function jump() {
+                if (gameActive) {
+                    player.velocity = player.jump;
+                }
+            }
+            
+            // Update game state
+            function update() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw background
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Update player position
+                player.velocity += player.gravity;
+                player.y += player.velocity;
+                
+                // Keep player within canvas
+                if (player.y + player.radius > canvas.height) {
+                    player.y = canvas.height - player.radius;
+                    player.velocity = 0;
+                }
+                
+                if (player.y - player.radius < 0) {
+                    player.y = player.radius;
+                    player.velocity = 0;
+                }
+                
+                // Create new obstacle if needed
+                if (obstacles.length === 0 || obstacles[obstacles.length - 1].y > 200) {
+                    let newY = obstacles.length === 0 ? -100 : -200;
+                    obstacles.push(createObstacle(newY));
+                }
+                
+                // Update and draw obstacles
+                for (let i = 0; i < obstacles.length; i++) {
+                    obstacles[i].y += obstacles[i].speed;
+                    
+                    // Check collision
+                    if (checkCollision(obstacles[i])) {
+                        gameOver();
+                        return;
+                    }
+                    
+                    // Check if passed
+                    if (!obstacles[i].passed && obstacles[i].y > player.y) {
+                        obstacles[i].passed = true;
+                        score++;
+                        scoreDisplay.textContent = score;
+                        
+                        // Increase game speed slightly
+                        if (score % 5 === 0) {
+                            obstacles.forEach(obs => {
+                                obs.speed += 0.5;
+                            });
+                        }
+                    }
+                    
+                    // Draw obstacle
+                    drawObstacle(obstacles[i]);
+                    
+                    // Remove obstacle if off screen
+                    if (obstacles[i].y - obstacles[i].radius > canvas.height) {
+                        obstacles.splice(i, 1);
+                        i--;
+                    }
+                }
+                
+                // Draw player
+                drawPlayer();
+                
+                // Loop animation
+                if (gameActive) {
+                    animationId = requestAnimationFrame(update);
+                }
+            }
+            
+            // Start game
+            function startGame() {
+                if (gameActive) return;
+                
+                // Reset game state
+                score = 0;
+                scoreDisplay.textContent = score;
+                obstacles.length = 0;
+                
+                player.x = canvas.width / 2;
+                player.y = canvas.height - 100;
+                player.colorIndex = 0;
+                player.color = colors[0];
+                player.velocity = 0;
+                
+                gameActive = true;
+                startBtn.textContent = 'Restart Game';
+                
+                // Start game loop
+                animationId = requestAnimationFrame(update);
+            }
+            
+            // Game over
+            function gameOver() {
+                gameActive = false;
+                cancelAnimationFrame(animationId);
+                
+                // Update high score
+                if (score > highScore) {
+                    highScore = score;
+                    highScoreDisplay.textContent = highScore;
+                    localStorage.setItem('colorSwitchHighScore', highScore);
+                }
+                
+                // Show game over message
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.fillStyle = 'white';
+                ctx.font = '30px Poppins';
+                ctx.textAlign = 'center';
+                ctx.fillText('Game Over!', canvas.width / 2, canvas.height / 2 - 30);
+                
+                ctx.font = '20px Poppins';
+                ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2 + 10);
+                ctx.fillText('Press Start to play again', canvas.width / 2, canvas.height / 2 + 50);
+                
+                startBtn.textContent = 'Start Game';
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startGame);
+            switchBtn.addEventListener('click', switchColor);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', function(e) {
+                if (e.code === 'Space') {
+                    e.preventDefault(); // Prevent scrolling
+                    jump();
+                } else if (e.code === 'KeyX' || e.code === 'KeyJ') {
+                    switchColor();
+                }
+            });
+            
+            // Initial draw
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            drawPlayer();
+            
+            // Instructions
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text');
+            ctx.font = '16px Poppins';
+            ctx.textAlign = 'center';
+            ctx.fillText('Press SPACE to jump', canvas.width / 2, 100);
+            ctx.fillText('Press X or tap button to switch color', canvas.width / 2, 130);
+        });
+    </script>
+    
+    <style>
+        /* Color Switch Game specific styles */
+        #game-canvas {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            max-width: 100%;
+            display: block;
+            margin: 0 auto;
+            border: 2px solid var(--primary);
+        }
+        
+        .mobile-controls {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .control-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+        
+        .control-btn:active {
+            transform: scale(0.95);
+            background-color: var(--primary-dark);
+        }
+    </style>
+</body>
+</html>

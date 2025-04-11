@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catch Falling Objects - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Catch Falling Objects</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>Catch the falling items before they hit the ground!</h2>
+            <div class="score-board">
+                <span>Score: <span id="score">0</span></span>
+                <span style="margin-left: 20px;">Lives: <span id="lives">3</span></span>
+                <span style="margin-left: 20px;">Time: <span id="time">60</span>s</span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Game</button>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <canvas id="catch-canvas" width="400" height="500"></canvas>
+            <div class="mobile-controls">
+                <button id="left-btn" class="control-btn"><i class="fas fa-arrow-left"></i></button>
+                <button id="right-btn" class="control-btn"><i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const canvas = document.getElementById('catch-canvas');
+            const ctx = canvas.getContext('2d');
+            const startBtn = document.getElementById('start-btn');
+            const scoreDisplay = document.getElementById('score');
+            const livesDisplay = document.getElementById('lives');
+            const timeDisplay = document.getElementById('time');
+            const leftBtn = document.getElementById('left-btn');
+            const rightBtn = document.getElementById('right-btn');
+            
+            // Set canvas dimensions based on container
+            function resizeCanvas() {
+                const container = canvas.parentElement;
+                const containerWidth = container.clientWidth;
+                
+                if (containerWidth < 400) {
+                    const ratio = canvas.height / canvas.width;
+                    canvas.width = containerWidth - 20; // Add some padding
+                    canvas.height = canvas.width * ratio;
+                }
+            }
+            
+            // Call resize on load
+            resizeCanvas();
+            
+            // Game variables
+            let score = 0;
+            let lives = 3;
+            let gameTime = 60;
+            let gameStarted = false;
+            let gameTimerId = null;
+            let animationId = null;
+            let fallingObjects = [];
+            let lastObjectTime = 0;
+            let primaryColor = '';
+            let accentColor = '';
+            let textColor = '';
+            
+            // Get theme colors
+            function updateColors() {
+                primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary');
+                accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent');
+                textColor = getComputedStyle(document.documentElement).getPropertyValue('--text');
+            }
+            
+            updateColors();
+            
+            // Player (basket)
+            const player = {
+                x: canvas.width / 2 - 40,
+                y: canvas.height - 50,
+                width: 80,
+                height: 20,
+                speed: 8,
+                dx: 0
+            };
+            
+            // Object types
+            const objectTypes = [
+                { color: '#F44336', points: 5, size: 20, speed: 3 },  // Red (apple)
+                { color: '#FFEB3B', points: 10, size: 15, speed: 5 },  // Yellow (banana)
+                { color: '#4CAF50', points: 15, size: 10, speed: 7 },  // Green (kiwi)
+                { color: '#9C27B0', points: -10, size: 20, speed: 6 }  // Purple (poison)
+            ];
+            
+            // Draw player
+            function drawPlayer() {
+                ctx.fillStyle = primaryColor;
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(player.x + player.width, player.y);
+                ctx.lineTo(player.x + player.width - 10, player.y + player.height);
+                ctx.lineTo(player.x + 10, player.y + player.height);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Draw handle
+                ctx.fillRect(player.x + player.width / 2 - 5, player.y, 10, -15);
+            }
+            
+            // Draw falling object
+            function drawObject(obj) {
+                ctx.fillStyle = obj.color;
+                ctx.beginPath();
+                ctx.arc(obj.x, obj.y, obj.size, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+            
+            // Create new falling object
+            function createObject() {
+                const typeIndex = Math.floor(Math.random() * objectTypes.length);
+                const type = objectTypes[typeIndex];
+                
+                const object = {
+                    x: Math.random() * (canvas.width - type.size * 2) + type.size,
+                    y: 0 - type.size,
+                    color: type.color,
+                    size: type.size,
+                    speed: type.speed,
+                    points: type.points
+                };
+                
+                fallingObjects.push(object);
+            }
+            
+            // Update game state
+            function update() {
+                // Move player
+                player.x += player.dx;
+                
+                // Keep player in bounds
+                if (player.x < 0) {
+                    player.x = 0;
+                } else if (player.x + player.width > canvas.width) {
+                    player.x = canvas.width - player.width;
+                }
+                
+                // Create new objects periodically
+                const currentTime = Date.now();
+                if (currentTime - lastObjectTime > 1000) {
+                    createObject();
+                    lastObjectTime = currentTime;
+                }
+                
+                // Update falling objects
+                for (let i = fallingObjects.length - 1; i >= 0; i--) {
+                    const obj = fallingObjects[i];
+                    obj.y += obj.speed;
+                    
+                    // Check if object is caught
+                    if (
+                        obj.y + obj.size > player.y &&
+                        obj.y - obj.size < player.y + player.height &&
+                        obj.x + obj.size > player.x &&
+                        obj.x - obj.size < player.x + player.width
+                    ) {
+                        // Object caught
+                        score += obj.points;
+                        if (score < 0) score = 0;
+                        scoreDisplay.textContent = score;
+                        
+                        // Remove object
+                        fallingObjects.splice(i, 1);
+                    }
+                    // Check if object hit the ground
+                    else if (obj.y - obj.size > canvas.height) {
+                        // Object missed
+                        if (obj.points > 0) {
+                            // Only lose lives for missing good objects
+                            lives--;
+                            livesDisplay.textContent = lives;
+                            
+                            if (lives <= 0) {
+                                gameOver();
+                            }
+                        }
+                        
+                        // Remove object
+                        fallingObjects.splice(i, 1);
+                    }
+                }
+            }
+            
+            // Draw the game
+            function render() {
+                // Clear canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // Set background
+                ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw player
+                drawPlayer();
+                
+                // Draw falling objects
+                fallingObjects.forEach(drawObject);
+            }
+            
+            // Game loop
+            function gameLoop() {
+                if (!gameStarted) return;
+                
+                update();
+                render();
+                animationId = requestAnimationFrame(gameLoop);
+            }
+            
+            // Game timer
+            function updateTimer() {
+                gameTime--;
+                timeDisplay.textContent = gameTime;
+                
+                if (gameTime <= 0) {
+                    gameOver();
+                }
+            }
+            
+            // Start game
+            function startGame() {
+                if (gameStarted) return;
+                
+                // Reset game state
+                score = 0;
+                lives = 3;
+                gameTime = 60;
+                fallingObjects = [];
+                
+                updateColors();
+                
+                scoreDisplay.textContent = score;
+                livesDisplay.textContent = lives;
+                timeDisplay.textContent = gameTime;
+                
+                startBtn.disabled = true;
+                gameStarted = true;
+                
+                // Start timer
+                gameTimerId = setInterval(updateTimer, 1000);
+                
+                // Start game loop
+                lastObjectTime = Date.now();
+                gameLoop();
+            }
+            
+            // Game over
+            function gameOver() {
+                gameStarted = false;
+                clearInterval(gameTimerId);
+                cancelAnimationFrame(animationId);
+                
+                setTimeout(() => {
+                    alert(`Game Over! You scored ${score} points.`);
+                    startBtn.disabled = false;
+                }, 100);
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startGame);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', function(e) {
+                if (!gameStarted) return;
+                
+                if (e.key === 'ArrowLeft') {
+                    player.dx = -player.speed;
+                } else if (e.key === 'ArrowRight') {
+                    player.dx = player.speed;
+                }
+            });
+            
+            document.addEventListener('keyup', function(e) {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    player.dx = 0;
+                }
+            });
+            
+            // Mobile controls
+            leftBtn.addEventListener('touchstart', function() {
+                player.dx = -player.speed;
+            });
+            
+            leftBtn.addEventListener('touchend', function() {
+                player.dx = 0;
+            });
+            
+            rightBtn.addEventListener('touchstart', function() {
+                player.dx = player.speed;
+            });
+            
+            rightBtn.addEventListener('touchend', function() {
+                player.dx = 0;
+            });
+            
+            // Mouse controls for desktop
+            canvas.addEventListener('mousemove', function(e) {
+                if (!gameStarted) return;
+                
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                
+                // Move player to mouse position (center of paddle)
+                player.x = mouseX - player.width / 2;
+                
+                // Keep player in bounds
+                if (player.x < 0) {
+                    player.x = 0;
+                } else if (player.x + player.width > canvas.width) {
+                    player.x = canvas.width - player.width;
+                }
+            });
+            
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                resizeCanvas();
+            });
+            
+            // Initial render
+            render();
+            
+            // Theme change event
+            themeToggleBtn.addEventListener('click', updateColors);
+        });
+    </script>
+    
+    <style>
+        /* Game specific styles */
+        #catch-canvas {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            max-width: 100%;
+            margin: 0 auto;
+            display: block;
+        }
+        
+        .mobile-controls {
+            display: none;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            margin: 0 10px;
+            background-color: var(--primary);
+            color: var(--primary-foreground);
+            border: none;
+            border-radius: 50%;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        @media (max-width: 768px) {
+            .mobile-controls {
+                display: block;
+            }
+        }
+    </style>
+</body>
+</html>

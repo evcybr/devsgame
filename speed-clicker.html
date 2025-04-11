@@ -1,0 +1,433 @@
+
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Clicker - Playful Browser Arcade</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Speed Clicker</h1>
+            <div class="theme-toggle">
+                <button id="theme-toggle-btn">
+                    <i class="fas fa-sun"></i>
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container game-container">
+        <div class="game-info">
+            <h2>How many times can you click in the given time?</h2>
+            <div class="score-board">
+                <span>Clicks: <span id="clicks">0</span></span>
+                <span style="margin-left: 20px;">Time: <span id="time">10</span>s</span>
+                <span style="margin-left: 20px;">CPS: <span id="cps">0.0</span></span>
+            </div>
+            <div class="game-controls">
+                <button id="start-btn" class="game-btn">Start Game</button>
+                <div class="time-selector">
+                    <label for="time-select">Duration:</label>
+                    <select id="time-select">
+                        <option value="5">5 seconds</option>
+                        <option value="10" selected>10 seconds</option>
+                        <option value="15">15 seconds</option>
+                        <option value="30">30 seconds</option>
+                        <option value="60">60 seconds</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-frame">
+            <div id="click-area" class="click-area">
+                <p id="click-text">Click here as fast as you can!</p>
+                <div id="click-counter" class="click-counter">0</div>
+            </div>
+        </div>
+        
+        <div id="results-container" class="results-container">
+            <h3>Your Results</h3>
+            <div class="results-grid">
+                <div class="result-item">
+                    <div class="result-label">Best Score</div>
+                    <div id="best-score" class="result-value">0</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Best CPS</div>
+                    <div id="best-cps" class="result-value">0.0</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Last Score</div>
+                    <div id="last-score" class="result-value">0</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Last CPS</div>
+                    <div id="last-cps" class="result-value">0.0</div>
+                </div>
+            </div>
+        </div>
+        
+        <a href="index.html" class="back-button">Back to Games</a>
+    </main>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Evcyber - All Rights Reserved 💻</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Theme toggle functionality
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            
+            const themeToggleBtn = document.getElementById('theme-toggle-btn');
+            themeToggleBtn.addEventListener('click', function() {
+                const currentTheme = document.documentElement.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Game elements
+            const clickArea = document.getElementById('click-area');
+            const clickText = document.getElementById('click-text');
+            const clickCounter = document.getElementById('click-counter');
+            const startBtn = document.getElementById('start-btn');
+            const timeSelect = document.getElementById('time-select');
+            const clicksDisplay = document.getElementById('clicks');
+            const timeDisplay = document.getElementById('time');
+            const cpsDisplay = document.getElementById('cps');
+            const bestScoreDisplay = document.getElementById('best-score');
+            const bestCpsDisplay = document.getElementById('best-cps');
+            const lastScoreDisplay = document.getElementById('last-score');
+            const lastCpsDisplay = document.getElementById('last-cps');
+            
+            // Game variables
+            let clicks = 0;
+            let timeLeft = 10;
+            let gameActive = false;
+            let timerId = null;
+            let startTime = 0;
+            let bestResults = {
+                5: { score: 0, cps: 0 },
+                10: { score: 0, cps: 0 },
+                15: { score: 0, cps: 0 },
+                30: { score: 0, cps: 0 },
+                60: { score: 0, cps: 0 }
+            };
+            
+            // Load best results from localStorage
+            const savedResults = localStorage.getItem('speedClickerResults');
+            if (savedResults) {
+                bestResults = JSON.parse(savedResults);
+            }
+            
+            // Update results display
+            function updateResultsDisplay() {
+                const duration = parseInt(timeSelect.value);
+                
+                bestScoreDisplay.textContent = bestResults[duration].score;
+                bestCpsDisplay.textContent = bestResults[duration].cps.toFixed(1);
+                
+                if (lastScoreDisplay.textContent === '0') {
+                    lastScoreDisplay.textContent = '-';
+                    lastCpsDisplay.textContent = '-';
+                }
+            }
+            
+            // Update results display initially
+            updateResultsDisplay();
+            
+            // Start game
+            function startGame() {
+                if (gameActive) return;
+                
+                // Reset game state
+                clicks = 0;
+                timeLeft = parseInt(timeSelect.value);
+                
+                // Update displays
+                clicksDisplay.textContent = clicks;
+                timeDisplay.textContent = timeLeft;
+                cpsDisplay.textContent = '0.0';
+                clickCounter.textContent = '0';
+                
+                // Change click area appearance
+                clickArea.classList.add('active');
+                clickText.textContent = 'Click!';
+                
+                gameActive = true;
+                startBtn.textContent = 'Game In Progress';
+                startBtn.disabled = true;
+                timeSelect.disabled = true;
+                
+                // Record start time
+                startTime = Date.now();
+                
+                // Start timer
+                timerId = setInterval(updateTimer, 1000);
+            }
+            
+            // Update timer
+            function updateTimer() {
+                timeLeft--;
+                timeDisplay.textContent = timeLeft;
+                
+                // Calculate CPS
+                const elapsedTime = (Date.now() - startTime) / 1000;
+                const currentCps = clicks / elapsedTime;
+                cpsDisplay.textContent = currentCps.toFixed(1);
+                
+                // Check if time is up
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }
+            
+            // End game
+            function endGame() {
+                // Stop timer
+                clearInterval(timerId);
+                
+                gameActive = false;
+                
+                // Change click area appearance
+                clickArea.classList.remove('active');
+                clickText.textContent = 'Click here as fast as you can!';
+                
+                // Calculate final CPS
+                const duration = parseInt(timeSelect.value);
+                const finalCps = clicks / duration;
+                
+                // Update displays
+                cpsDisplay.textContent = finalCps.toFixed(1);
+                
+                // Update last score
+                lastScoreDisplay.textContent = clicks;
+                lastCpsDisplay.textContent = finalCps.toFixed(1);
+                
+                // Check if new best
+                if (clicks > bestResults[duration].score) {
+                    bestResults[duration].score = clicks;
+                    bestResults[duration].cps = finalCps;
+                    
+                    // Save to localStorage
+                    localStorage.setItem('speedClickerResults', JSON.stringify(bestResults));
+                    
+                    // Update display
+                    updateResultsDisplay();
+                    
+                    // Show congratulations message
+                    alert(`New best score: ${clicks} clicks (${finalCps.toFixed(1)} CPS)!`);
+                }
+                
+                // Reset UI
+                startBtn.textContent = 'Start Game';
+                startBtn.disabled = false;
+                timeSelect.disabled = false;
+            }
+            
+            // Handle click on the click area
+            function handleClick() {
+                if (!gameActive) return;
+                
+                // Increment clicks
+                clicks++;
+                
+                // Update displays
+                clicksDisplay.textContent = clicks;
+                clickCounter.textContent = clicks;
+                
+                // Animate click counter
+                clickCounter.classList.remove('click-animation');
+                void clickCounter.offsetWidth; // Trigger reflow to restart animation
+                clickCounter.classList.add('click-animation');
+                
+                // Random position for click counter
+                const x = Math.random() * (clickArea.offsetWidth - 40);
+                const y = Math.random() * (clickArea.offsetHeight - 40);
+                clickCounter.style.left = `${x}px`;
+                clickCounter.style.top = `${y}px`;
+            }
+            
+            // Event listeners
+            startBtn.addEventListener('click', startGame);
+            clickArea.addEventListener('click', handleClick);
+            
+            // Update results display when time selection changes
+            timeSelect.addEventListener('change', updateResultsDisplay);
+        });
+    </script>
+    
+    <style>
+        /* Speed Clicker Game specific styles */
+        .click-area {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 5px 15px var(--shadow);
+            transition: background-color 0.3s;
+            border: 2px dashed var(--text-light);
+        }
+        
+        .click-area.active {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+        }
+        
+        .click-area p {
+            font-size: 1.5rem;
+            text-align: center;
+            padding: 0 20px;
+            margin-bottom: 20px;
+            pointer-events: none;
+        }
+        
+        .click-area.active p {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .click-counter {
+            position: absolute;
+            font-size: 1.2rem;
+            color: white;
+            background-color: var(--accent);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            opacity: 0;
+        }
+        
+        .click-animation {
+            animation: pop-up 0.5s ease-out;
+        }
+        
+        @keyframes pop-up {
+            0% {
+                transform: scale(0.5);
+                opacity: 1;
+            }
+            70% {
+                transform: scale(1.2);
+                opacity: 0.7;
+            }
+            100% {
+                transform: scale(1);
+                opacity: 0;
+            }
+        }
+        
+        .time-selector {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 15px;
+        }
+        
+        .time-selector label {
+            margin-right: 10px;
+        }
+        
+        .time-selector select {
+            padding: 8px 15px;
+            border-radius: 25px;
+            border: 2px solid var(--primary);
+            background-color: var(--card-bg);
+            color: var(--text);
+            font-family: 'Poppins', sans-serif;
+            cursor: pointer;
+        }
+        
+        .results-container {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 5px 15px var(--shadow);
+        }
+        
+        .results-container h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
+        
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .result-item {
+            padding: 15px;
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+        
+        .result-label {
+            font-size: 0.9rem;
+            color: var(--text-light);
+            margin-bottom: 5px;
+        }
+        
+        .result-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        @media (max-width: 600px) {
+            .click-area {
+                height: 250px;
+            }
+            
+            .click-area p {
+                font-size: 1.2rem;
+            }
+            
+            .click-area.active p {
+                font-size: 1.5rem;
+            }
+            
+            .game-controls {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+            
+            .time-selector {
+                margin-left: 0;
+            }
+            
+            .results-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+        }
+    </style>
+</body>
+</html>
